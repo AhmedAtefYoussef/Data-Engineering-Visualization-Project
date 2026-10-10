@@ -10,7 +10,7 @@ We count injury crashes, meaning crashes where at least one person was hurt or k
 
 Every result is an association. Housing sites are not chosen at random and neighbourhoods change for many reasons, so none of these numbers shows that housing caused anything. A 95% interval that includes zero means the data fit no change as well as a small rise or a small fall.
 
-## Member 1: Ahmed Atef Youssef
+## Member 1: Ahmed Atef (16007032)
 
 ### RQ1. Does knowing how much affordable housing a ZIP code completed help forecast its injury crashes?
 
@@ -28,7 +28,7 @@ How we measured it: we followed the same 171 ZIP codes over ten years and compar
 
 What it means for the city: at the scale of a ZIP code, building affordable housing did not come with a visible change in injury crashes. A ZIP code is large, so this says little about the street in front of a new building. RQ3 looks at that.
 
-## Member 2: name to fill in
+## Member 2: Nour Mostafa Aly (16001618)
 
 ### RQ3. Do injury crashes near a new building change after it opens?
 
@@ -46,7 +46,7 @@ How we measured it: on the same 128 sites we related the before-to-after change 
 
 What it means for the city: if new residents were driving crashes, large buildings should show it most. They do not, which fits the answer to RQ3.
 
-## Member 3: name to fill in
+## Member 3: Yahia Mohamed (16004934)
 
 ### RQ5. Is the change different for new construction than for preservation?
 
@@ -64,7 +64,7 @@ How we measured it: near completed sites and near comparison sites we computed t
 
 What it means for the city: more residents usually means more people on foot. The records do not show that turning into a larger share of pedestrian and cyclist injuries, though the interval is wide enough to hide a shift of a few points.
 
-## Member 4: name to fill in
+## Member 4: Moaz Ahmed (16003110)
 
 ### RQ7. Before construction starts, do these sites already stand on streets with more injury crashes?
 
@@ -82,7 +82,7 @@ How we measured it: we split injury crashes near sites into night, morning, afte
 
 What it means for the city: there is no sign that completions move crashes toward school hours, the commute or the night. Time-based measures near these sites can follow the same pattern as the rest of the neighbourhood.
 
-## Member 5: name to fill in
+## Member 5: Yassin Fady (16005869)
 
 ### RQ9. Do ZIP codes with more deeply affordable units have a different pedestrian and cyclist share of injuries?
 

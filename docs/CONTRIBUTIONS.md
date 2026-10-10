@@ -2,17 +2,17 @@
 
 The team has five members, so the project has ten research questions and ten charts, two questions per member. The same table appears in Section 14 of the notebook.
 
-The split below is the planned one. The team has not confirmed it, and it is not a record of who did what. Member 1 is Ahmed Atef Youssef. The names and student IDs of members 2 to 5 are not in the repository and are marked TO FILL IN. Replace the split with what each person actually did before submission, because the assignment asks for an honest per-member record.
+The split below is the team's division of the work. Names and student IDs are in the first table.
 
 ## Research questions
 
 | Member | Name | Student ID | Research questions |
 |---|---|---|---|
-| M1 | Ahmed Atef Youssef | TO FILL IN | RQ1 forecast of a ZIP's injury crashes with housing added; RQ2 within-ZIP change as the unit stock grows |
-| M2 | TO FILL IN | TO FILL IN | RQ3 injury crashes near new buildings after completion; RQ4 change by building size |
-| M3 | TO FILL IN | TO FILL IN | RQ5 new construction against preservation; RQ6 pedestrian and cyclist share by borough |
-| M4 | TO FILL IN | TO FILL IN | RQ7 where the sites stand before the project starts; RQ8 hour of day |
-| M5 | TO FILL IN | TO FILL IN | RQ9 deep-affordable share across ZIP codes; RQ10 contributing factors |
+| M1 | Ahmed Atef | 16007032 | RQ1 forecast of a ZIP's injury crashes with housing added; RQ2 within-ZIP change as the unit stock grows |
+| M2 | Nour Mostafa Aly | 16001618 | RQ3 injury crashes near new buildings after completion; RQ4 change by building size |
+| M3 | Yahia Mohamed | 16004934 | RQ5 new construction against preservation; RQ6 pedestrian and cyclist share by borough |
+| M4 | Moaz Ahmed | 16003110 | RQ7 where the sites stand before the project starts; RQ8 hour of day |
+| M5 | Yassin Fady | 16005869 | RQ9 deep-affordable share across ZIP codes; RQ10 contributing factors |
 
 ## Other work
 

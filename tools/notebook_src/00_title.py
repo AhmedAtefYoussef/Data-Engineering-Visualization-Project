@@ -38,11 +38,11 @@
 #
 # | Member | Name | Student ID | Research questions |
 # |---|---|---|---|
-# | M1 | Ahmed Atef Youssef | TO FILL IN | RQ1 Do housing completions improve a forecast of a ZIP code's injury crashes? RQ2 Do injury crashes in a ZIP code move as its stock of affordable units grows? |
-# | M2 | TO FILL IN | TO FILL IN | RQ3 Do injury crashes within 250 m of a new building change after completion? RQ4 Does that change grow with the size of the building? |
-# | M3 | TO FILL IN | TO FILL IN | RQ5 Is the change different for new construction than for preservation? RQ6 Does the pedestrian and cyclist share of injury crashes change after completion, by borough? |
-# | M4 | TO FILL IN | TO FILL IN | RQ7 Before the project starts, are the sites already on streets with more injury crashes than typical street locations of the borough? RQ8 Does the hour-of-day mix of injury crashes shift after completion? |
-# | M5 | TO FILL IN | TO FILL IN | RQ9 Is the share of deeply affordable units in a ZIP code associated with crash severity or the pedestrian and cyclist share of harm? RQ10 Which contributing-factor groups are over- or under-represented near completed housing? |
+# | M1 | Ahmed Atef | 16007032 | RQ1 Do housing completions improve a forecast of a ZIP code's injury crashes? RQ2 Do injury crashes in a ZIP code move as its stock of affordable units grows? |
+# | M2 | Nour Mostafa Aly | 16001618 | RQ3 Do injury crashes within 250 m of a new building change after completion? RQ4 Does that change grow with the size of the building? |
+# | M3 | Yahia Mohamed | 16004934 | RQ5 Is the change different for new construction than for preservation? RQ6 Does the pedestrian and cyclist share of injury crashes change after completion, by borough? |
+# | M4 | Moaz Ahmed | 16003110 | RQ7 Before the project starts, are the sites already on streets with more injury crashes than typical street locations of the borough? RQ8 Does the hour-of-day mix of injury crashes shift after completion? |
+# | M5 | Yassin Fady | 16005869 | RQ9 Is the share of deeply affordable units in a ZIP code associated with crash severity or the pedestrian and cyclist share of harm? RQ10 Which contributing-factor groups are over- or under-represented near completed housing? |
 #
 # ## The two datasets
 #

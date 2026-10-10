@@ -129,15 +129,15 @@ Email ICS503Data@gmail.com by 9 November 2026 with:
 
 ## Team contributions
 
-Five members, two research questions each. The names and student IDs marked TO FILL IN are not known to the author of this file and must be completed by the team. The full split of cleaning, integration, website and documentation work is in `docs/CONTRIBUTIONS.md` and in Section 14 of the notebook. `docs/ANSWERS.md` answers each member's two research questions in plain words, with how the answer was measured and what it means for the city.
+Five members, two research questions each. The full split of cleaning, integration, website and documentation work is in `docs/CONTRIBUTIONS.md` and in Section 14 of the notebook. `docs/ANSWERS.md` answers each member's two research questions in plain words, with how the answer was measured and what it means for the city.
 
 | Member | Name | Student ID | Research questions |
 |---|---|---|---|
-| M1 | Ahmed Atef Youssef | TO FILL IN | RQ1 forecast of a ZIP's injury crashes, RQ2 within-ZIP change as the unit stock grows |
-| M2 | TO FILL IN | TO FILL IN | RQ3 before and after at new buildings, RQ4 building size |
-| M3 | TO FILL IN | TO FILL IN | RQ5 new construction against preservation, RQ6 pedestrian and cyclist share |
-| M4 | TO FILL IN | TO FILL IN | RQ7 where the sites stand before construction, RQ8 hour of day |
-| M5 | TO FILL IN | TO FILL IN | RQ9 deep-affordable share across ZIPs, RQ10 contributing factors |
+| M1 | Ahmed Atef | 16007032 | RQ1 forecast of a ZIP's injury crashes, RQ2 within-ZIP change as the unit stock grows |
+| M2 | Nour Mostafa Aly | 16001618 | RQ3 before and after at new buildings, RQ4 building size |
+| M3 | Yahia Mohamed | 16004934 | RQ5 new construction against preservation, RQ6 pedestrian and cyclist share |
+| M4 | Moaz Ahmed | 16003110 | RQ7 where the sites stand before construction, RQ8 hour of day |
+| M5 | Yassin Fady | 16005869 | RQ9 deep-affordable share across ZIPs, RQ10 contributing factors |
 
 ## How this was built
 
