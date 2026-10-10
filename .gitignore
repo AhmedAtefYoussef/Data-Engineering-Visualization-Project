@@ -1,0 +1,12 @@
+# Python and Jupyter caches
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+.env
+
+# Interrupted crash download (the finished file is notebooks/crashes_h9gi-nx95.csv.gz)
+notebooks/*.part
+
+# Local Claude Code settings
+.claude/
