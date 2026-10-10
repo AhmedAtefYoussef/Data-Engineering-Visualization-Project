@@ -94,8 +94,14 @@ def controls() -> html.Div:
             dcc.Input(id="search", type="search", debounce=False, value="", className="search-input",
                       placeholder="Type a place, a period and what you want to see", autoComplete="off",
                       spellCheck=False, n_submit=0),
-            html.Span(["Press ", html.Kbd("Enter"), " to generate"], className="search-key",
-                      **{"aria-hidden": "true"}),
+            # The clear button and the key hint share one row on the right of the field, so the gap
+            # between them is set in one place. assets/site.js empties the field when the button is pressed.
+            html.Div(className="search-tools", children=[
+                html.Button("\u00d7", id="search-clear", className="search-clear", type="button", n_clicks=0,
+                            title="Clear the search", **{"aria-label": "Clear the search"}),
+                html.Span(["Press ", html.Kbd("Enter"), " to generate"], className="search-key",
+                          **{"aria-hidden": "true"}),
+            ]),
         ]),
         html.P(["Try ", *[html.Button(text, id=f"example-{position}", className="example",
                                       n_clicks=0, type="button")
