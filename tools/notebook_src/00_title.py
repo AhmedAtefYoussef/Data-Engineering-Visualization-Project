@@ -79,6 +79,5 @@
 # | The discovery: what we found and what surprised us | 10 |
 # | The limits | 11 |
 # | The impact: who can use this | 12 |
-# | Prompts used in the project | 13 |
-# | Individual contributions | 14 |
-# | How to run the notebook, versions and data-as-of stamp | 15 |
+# | Individual contributions | 13 |
+# | How to run the notebook, versions and data-as-of stamp | 14 |

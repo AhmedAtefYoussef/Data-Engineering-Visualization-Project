@@ -1,6 +1,6 @@
 # Prompts used
 
-AI coding assistants (Claude models from Anthropic, used through Claude Code) drafted the code and text of this project. The same account is in Section 13 of the notebook. The notebook and the website send nothing to a language model.
+AI coding assistants (Claude models from Anthropic, used through Claude Code) drafted the code and text of this project. The notebook and the website send nothing to a language model.
 
 Prompts whose text the team has are quoted in full. The others are described, and the description says so.
 

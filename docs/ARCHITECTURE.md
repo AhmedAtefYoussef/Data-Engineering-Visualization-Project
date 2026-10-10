@@ -42,7 +42,7 @@ The notebook is generated from the files in `tools/notebook_src/`, one file per 
 | `07_toolkit.py` | Bootstrap, rank correlation, within-unit slopes, before and after, multiple tests, forecast evaluation, with a self-test |
 | `08a_rq_1_5.py`, `08b_rq_6_10.py` | The ten research questions |
 | `09_robustness.py` | Robustness checks of the central comparison and of the ZIP-level results |
-| `10_story.py` | What was found, limits, impact, prompts, contributions, reproducibility |
+| `10_story.py` | What was found, limits, impact, contributions, reproducibility |
 
 `tools/assemble_notebook.py` parses each file, concatenates the cells, runs them with nbclient inside `notebooks/` (where the two data files sit) and writes `notebooks/NYC_Housing_Safety.ipynb`. The notebook imports nothing from the repository. It needs only the two data files and the libraries in `requirements.txt`, and downloads the files if they are missing. Numbers that come from the data are printed by code, so the text follows the data.
 
