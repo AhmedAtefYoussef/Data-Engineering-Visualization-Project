@@ -31,7 +31,7 @@ In the first version, Opus 5.5 reviewed the specification and audited the result
 
 ## What this process does not cover
 
-- The deployed site. It has not been deployed, and gunicorn has not been run on Windows. Memory on Render's free plan has not been measured.
+- The deployed site. It has not been deployed. The Vercel configuration follows Vercel's documentation and has not been tried there.
 - The stored outputs of the committed notebook are a snapshot. Rebuild with `python tools/assemble_notebook.py --execute` after any change to a section file, and rebuild the website data with `python tools/build_app_data.py`.
 - Whether each student has read and can explain their parts. The code and text were drafted by AI assistants under the team's direction. The checks each student should do are in `docs/CONTRIBUTIONS.md`.
 - Names and student IDs of members 2 to 5, which are not in the repository.

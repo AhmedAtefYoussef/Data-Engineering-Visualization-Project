@@ -23,7 +23,7 @@ The project has three deliverables that share one code base: a notebook, a websi
                                                          v
                                               app/ (Dash, reads only app/data/)
                                                          |
-                                              gunicorn on Render
+                                              one Python function on Vercel
 ```
 
 ## The notebook
@@ -52,11 +52,11 @@ The notebook is generated from the files in `tools/notebook_src/`, one file per 
 
 ## The website
 
-The site is a single Dash page served by gunicorn. It loads `app/data/` once at start-up, builds the layout, registers the callbacks and computes the default report so the first visitor does not wait for the bootstraps. It imports nothing from the notebook or the raw data, and it downloads nothing at start-up.
+The site is a single Dash page. On Vercel it runs as one Python function; locally it runs with `python -m app.app`. It loads `app/data/` once at start-up, builds the layout, registers the callbacks and computes the default report so the first visitor does not wait for the bootstraps. It imports nothing from the notebook or the raw data, and it downloads nothing at start-up.
 
 | Module | Responsibility |
 |---|---|
-| `app.py` | Entry point (`app.app:server` for gunicorn, `python -m app.app` locally); serves the map grid as cached, gzipped GeoJSON |
+| `app.py` | Entry point (`app.app:server` on Vercel, `python -m app.app` locally); serves the map grid as cached, gzipped GeoJSON |
 | `data.py` | Loads the parquet files and filters the pre-aggregated tables |
 | `filters.py` | The filter model: borough, from and to year, construction type, building size, contributing factor, time of day, who was harmed, crash location |
 | `search.py` | Query parser; a longest-phrase vocabulary lookup plus year patterns, with typo tolerance. It sets filters and reports what it understood and what it ignored |
@@ -73,7 +73,7 @@ If `app/data/` is missing, the page shows a short "not ready" message and the se
 
 ## Deployment
 
-`render.yaml` defines one free Render web service: Python 3.12.8, `pip install -r requirements.txt` as the build, and `gunicorn app.app:server --workers 1 --threads 4 --timeout 120 --preload` as the start command. `Procfile` has the same start command for hosts that read one. `runtime.txt` names the Python version. The site needs no environment variables, disk or database. It has not been deployed yet.
+`pyproject.toml` tells Vercel to serve `app.app:server`, the Flask server that Dash creates, on Python 3.12 or newer. `requirements.txt` lists the five packages the site needs, and `requirements-dev.txt` adds what the notebook, the data build and the tests need. `.vercelignore` keeps `notebooks/`, `tools/`, `tests/` and `docs/` out of the deployment. The site needs no environment variables, disk or database. It has not been deployed yet.
 
 ## Tests
 
@@ -91,5 +91,5 @@ If `app/data/` is missing, the page shows a short "not ready" message and the se
 | Gaps created by joins | Section 6 logs each repair; ZIP recovery is validated on hidden rows and flagged in the data |
 | Chart and text drifting from the data | Data-derived numbers are printed by code; the site's story reads `results.json`; a test compares site and notebook |
 | Website load time | Pre-aggregated cubes, a gzipped map grid and warmed caches; the site never touches raw data |
-| Render free plan, 512 MB | About 3.3 MB of data and one worker; memory was about 280 MB locally and has not been measured on Render |
+| Vercel function limits (500 MB bundle, 2 GB memory) | About 350 MB of packages and 3.3 MB of data; memory was about 280 MB locally and has not been measured on Vercel |
 | A stale site after the notebook changes | `build_app_data.py` regenerates every file from the same section sources and checks RQ3 and RQ7 |

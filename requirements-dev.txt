@@ -1,0 +1,17 @@
+# Everything needed to work on the project: the website, the notebook, the data build and the tests.
+-r requirements.txt
+
+# --- Notebook (notebooks/NYC_Housing_Safety.ipynb) and the data build (tools/) ---------------
+matplotlib>=3.8
+seaborn>=0.13
+scipy>=1.13
+scikit-learn>=1.5
+requests>=2.32         # the notebook downloads the two datasets if they are not next to it
+ipython>=8
+ipykernel>=6.29
+jupytext>=1.16         # tools/assemble_notebook.py and tools/build_app_data.py parse the section sources
+nbformat>=5.10
+nbclient>=0.10
+
+# --- Tests ------------------------------------------------------------------------------------
+pytest>=8
