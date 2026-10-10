@@ -1,0 +1,13 @@
+# Render blueprint: one free web service. The site reads only the files committed in app/data/
+# (about 3 MB), so it needs no environment variables, no disk and no network access at start-up.
+services:
+  - type: web
+    name: nyc-housing-safety
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app.app:server --workers 1 --threads 4 --timeout 120 --preload --bind 0.0.0.0:$PORT
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8

@@ -1,0 +1,445 @@
+{
+ "questions": {
+  "RQ1": {
+   "question": "Does knowing a ZIP's affordable-housing completions improve an out-of-time forecast of its injury crashes?",
+   "sentence": "The change in out-of-time forecast error from adding affordable-housing completions and stock is +0.59 injury crashes per ZIP per year (95% interval +0.16 to +1.10, n = 171 ZIP codes). The interval lies above zero, which fits a less accurate forecast.",
+   "estimate": 0.5922620530504297,
+   "low": 0.16069970409926138,
+   "high": 1.1006836826100905,
+   "level": 0.95,
+   "adjusted_p": null,
+   "n": 171,
+   "owner": "M1",
+   "label": "Forecast error when housing is added",
+   "unit": "MAE difference (injury crashes per ZIP per year)",
+   "n_unit": "ZIP codes",
+   "direction": "right of zero = forecast less accurate with housing",
+   "excludes_zero": true,
+   "kept": true
+  },
+  "RQ2": {
+   "question": "Within a ZIP over time, do injury crashes move as the cumulative stock of completed affordable units grows?",
+   "sentence": "The within-ZIP change in injury crashes as the stock of completed affordable units grows is +0.07 percent per 100 units (95% interval -0.06 to +0.41, n = 171 ZIP codes). The interval includes zero.",
+   "estimate": 0.07456526225755838,
+   "low": -0.05923402507992156,
+   "high": 0.4097027949312915,
+   "level": 0.95,
+   "adjusted_p": null,
+   "n": 171,
+   "owner": "M1",
+   "label": "Injury crashes as the unit stock grows",
+   "unit": "% change in injury crashes per 100 units",
+   "n_unit": "ZIP codes",
+   "direction": "right of zero = more injury crashes with a larger stock",
+   "excludes_zero": false,
+   "kept": false
+  },
+  "RQ3": {
+   "question": "Do injury crashes within 250 m of new-construction sites change after completion, relative to not-yet-completed sites?",
+   "sentence": "The after-against-before change in injury crashes within 250 m of new buildings, relative to comparison sites, is -4.6 percent (95% interval -11.9 to +3.3, n = 128 new-construction sites). The interval includes zero.",
+   "estimate": -4.561456159253275,
+   "low": -11.903330624894783,
+   "high": 3.3291950172233418,
+   "level": 0.95,
+   "adjusted_p": null,
+   "n": 128,
+   "owner": "M2",
+   "label": "After against before, new buildings",
+   "unit": "% change relative to comparison sites",
+   "n_unit": "new-construction sites",
+   "direction": "right of zero = more injury crashes after completion",
+   "excludes_zero": false,
+   "kept": false
+  },
+  "RQ4": {
+   "question": "Does the before/after change in injury crashes at a new-construction site scale with the number of units?",
+   "sentence": "The slope of the after-against-before change in injury crashes on the units completed in that year within 250 m is -2.2 percent per doubling of units (95% interval -5.8 to +1.1, n = 128 new-construction sites). The interval includes zero.",
+   "estimate": -2.202478671074181,
+   "low": -5.7782060902167265,
+   "high": 1.0864013949487232,
+   "level": 0.95,
+   "adjusted_p": null,
+   "n": 128,
+   "owner": "M2",
+   "label": "Change by units completed nearby",
+   "unit": "% change per doubling of units",
+   "n_unit": "new-construction sites",
+   "direction": "right of zero = larger rise where more units were completed",
+   "excludes_zero": false,
+   "kept": false
+  },
+  "RQ5": {
+   "question": "Is the before/after change in injury crashes different near New Construction than near Preservation (the placebo)?",
+   "sentence": "The after-to-before ratio of injury crashes around new construction, relative to the same ratio around preservation, is -8.1 percent (95% interval -19.6 to +4.9, n = 306 completed sites). The interval includes zero.",
+   "estimate": -8.097780855809852,
+   "low": -19.57590459791252,
+   "high": 4.856489533013831,
+   "level": 0.95,
+   "adjusted_p": null,
+   "n": 306,
+   "owner": "M3",
+   "label": "New construction against preservation",
+   "unit": "% difference between the two after/before ratios",
+   "n_unit": "completed sites",
+   "direction": "right of zero = change more positive at new construction",
+   "excludes_zero": false,
+   "kept": false
+  },
+  "RQ6": {
+   "question": "Does the pedestrian and cyclist share of injury crashes near sites change after completion?",
+   "sentence": "The gap in the pedestrian and cyclist share of injury crashes (completed minus comparison sites) is +1.22 percentage points (95% interval -1.08 to +3.39, n = 306 completed sites, against 696 comparison sites, in 409 clusters). The interval includes zero.",
+   "estimate": 1.2216603737345444,
+   "low": -1.0805128861347697,
+   "high": 3.385883850937014,
+   "level": 0.95,
+   "adjusted_p": null,
+   "n": 306,
+   "owner": "M3",
+   "label": "Pedestrian and cyclist share",
+   "unit": "percentage points, completed minus comparison sites",
+   "n_unit": "completed sites",
+   "direction": "right of zero = share rose more at completed sites",
+   "excludes_zero": false,
+   "kept": false
+  },
+  "RQ7": {
+   "question": "Before the project starts, are new-construction sites on streets with more injury crashes than typical street locations of the borough?",
+   "sentence": "The mean borough percentile of new-construction sites, before their project started, minus 50 is +19.65 percentile points (95% interval +16.30 to +22.75, n = 2,789 new-construction sites in 336 one-kilometre blocks). The interval lies above zero, which fits sites standing where there were already more injury crashes than at the typical street point of the borough.",
+   "estimate": 19.64873953723162,
+   "low": 16.30043499451772,
+   "high": 22.7539915518992,
+   "level": 0.95,
+   "adjusted_p": null,
+   "n": 2789,
+   "owner": "M4",
+   "label": "Where new-construction sites stand before the project",
+   "unit": "percentile points above the typical street point of the borough",
+   "n_unit": "new-construction sites",
+   "direction": "right of zero = more injury crashes than the typical street point",
+   "excludes_zero": true,
+   "kept": true
+  },
+  "RQ8": {
+   "question": "Does the hour-of-day mix of injury crashes near sites shift after completion?",
+   "sentence": "The largest gap among the 4 parts of the day, the one for the share of injury crashes in the afternoon (12:00 to 17:59), with its interval widened for 4 tests, is +1.41 percentage points (99% interval -2.05 to +4.23, n = 306 completed sites, against 696 comparison sites, in 409 clusters). The interval includes zero.",
+   "estimate": 1.4126873443844092,
+   "low": -2.0521575385360498,
+   "high": 4.2301377204499495,
+   "level": 0.9875,
+   "adjusted_p": 0.594072594072594,
+   "n": 306,
+   "owner": "M4",
+   "label": "Hour of day (largest band gap)",
+   "unit": "percentage points; largest of 4 gaps, interval widened for 4 tests",
+   "n_unit": "completed sites",
+   "direction": "right of zero = share rose more at completed sites",
+   "excludes_zero": false,
+   "kept": false
+  },
+  "RQ9": {
+   "question": "Across ZIP codes, is the deep-affordable share associated with the pedestrian and cyclist share of harm?",
+   "sentence": "The within-borough rank correlation between the deep-affordable share and the pedestrian and cyclist share of injury crashes is -0.216 (95% interval -0.394 to -0.001, n = 123 ZIP codes in 5 boroughs). The interval excludes zero by 0.001, the p-value is 0.052 and 0.104 after adjustment for the two outcomes, so this is not counted as a difference from zero.",
+   "estimate": -0.21606125671886,
+   "low": -0.3935901529445867,
+   "high": -0.0012829508716681026,
+   "level": 0.95,
+   "adjusted_p": 0.1038961038961039,
+   "n": 123,
+   "owner": "M5",
+   "label": "Deep-affordable share and who is hurt",
+   "unit": "rank correlation within borough",
+   "n_unit": "ZIP codes",
+   "direction": "right of zero = higher pedestrian and cyclist share where the stock is deeper",
+   "excludes_zero": true,
+   "kept": false
+  },
+  "RQ10": {
+   "question": "Which contributing-factor groups are over- or under-represented near completed housing, after against before?",
+   "sentence": "The largest gap among the 9 factor groups, the one for the share of \"Impairment or medical\" among injury crashes with a recorded factor, with its interval widened for 9 tests, is -0.83 percentage points (99% interval -2.76 to +0.67, n = 306 completed sites, against 696 comparison sites, in 409 clusters). The interval includes zero.",
+   "estimate": -0.8307792517811284,
+   "low": -2.755327391531349,
+   "high": 0.6687722455393112,
+   "level": 0.9944444444444445,
+   "adjusted_p": 0.9330669330669331,
+   "n": 306,
+   "owner": "M5",
+   "label": "Contributing factor (largest group gap)",
+   "unit": "percentage points; largest of 9 gaps, interval widened for 9 tests",
+   "n_unit": "completed sites",
+   "direction": "right of zero = share rose more at completed sites",
+   "excludes_zero": false,
+   "kept": false
+  }
+ },
+ "detail": {
+  "rq3_did": {
+   "percent_change": -4.561456159253275,
+   "percent_low": -11.903330624894783,
+   "percent_high": 3.3291950172233418,
+   "p_value": 0.23976023976023977,
+   "n_treated": 128,
+   "n_control": 1869
+  },
+  "rq3_pretrend": {
+   "percent_change": 6.614635531073586,
+   "percent_low": -6.861544314908899,
+   "percent_high": 20.96309236515642
+  },
+  "rq5_by_type": {
+   "New Construction": {
+    "percent": -4.561456159253275,
+    "low": -12.137493085974532,
+    "high": 3.2924323852487376,
+    "n": 128
+   },
+   "Preservation": {
+    "percent": 3.8479208984151434,
+    "low": -7.000392719512469,
+    "high": 16.222747125013086,
+    "n": 178
+   },
+   "New construction relative to preservation": {
+    "percent": -8.097780855809852,
+    "low": -19.57590459791252,
+    "high": 4.856489533013831,
+    "n": 306
+   }
+  },
+  "rq7": {
+   "new": {
+    "estimate": 19.64873953723162,
+    "low": 16.30043499451772,
+    "high": 22.7539915518992,
+    "n": 2789,
+    "units_resampled": 336,
+    "cluster_low": 9.949239529617774,
+    "cluster_high": 22.764245537853675
+   },
+   "preservation": {
+    "estimate": 8.976440353542685,
+    "low": 4.819249986253087,
+    "high": 13.360344008434842,
+    "n": 2090,
+    "units_resampled": 243,
+    "cluster_low": -1.1429978608310998,
+    "cluster_high": 16.98009250333885
+   },
+   "gap": {
+    "estimate": 10.672299183688935,
+    "low": 5.3897583781405345,
+    "high": 15.160048496723286,
+    "n": 4879,
+    "units_resampled": 397,
+    "cluster_low": 3.702269666140863,
+    "cluster_high": 16.78139540203865
+   },
+   "pooled": {
+    "estimate": 15.077084424727033,
+    "low": 12.107454159044657,
+    "high": 18.007304261311106,
+    "n": 4879,
+    "units_resampled": 397,
+    "cluster_low": 5.05821522609944,
+    "cluster_high": 20.191327070007283
+   },
+   "within_zip": {
+    "estimate": 8.633609594835633,
+    "low": 5.497036017346042,
+    "high": 11.267786974374477,
+    "n": 2662,
+    "units_resampled": 304,
+    "cluster_low": 5.221662763915678,
+    "cluster_high": 12.106279752559878
+   },
+   "gap_in_borough": {
+    "estimate": 8.252997369925218,
+    "low": 2.6030416234405527,
+    "high": 12.841841937283686,
+    "n": 4879,
+    "units_resampled": 397,
+    "cluster_low": 2.7455898024160486,
+    "cluster_high": 17.504459788651467
+   },
+   "gap_within_zip": {
+    "estimate": 3.402982964375738,
+    "low": -0.8775598096364559,
+    "high": 7.892396183562216,
+    "n": 4253,
+    "units_resampled": 359,
+    "cluster_low": -1.5350699070231617,
+    "cluster_high": 8.324622908086026
+   }
+  },
+  "rq7_new_sites": {
+   "share_above_borough_median_pct": 79.20401577626389,
+   "median_baseline_crashes": 62.0,
+   "median_baseline_crashes_reference": 29.0,
+   "reference_points": 9543
+  },
+  "rq7_by_borough": [
+   {
+    "borough": "Bronx",
+    "reference_points": 1408,
+    "median_crashes_reference": 34.0,
+    "sites": 1569,
+    "median_crashes_sites": 55.0,
+    "mean_percentile_sites": 67.41177157569963,
+    "share_above_borough_median_pct": 76.67304015296367
+   },
+   {
+    "borough": "Brooklyn",
+    "reference_points": 2500,
+    "median_crashes_reference": 41.0,
+    "sites": 1826,
+    "median_crashes_sites": 64.0,
+    "mean_percentile_sites": 68.81417305585981,
+    "share_above_borough_median_pct": 79.29901423877328
+   },
+   {
+    "borough": "Manhattan",
+    "reference_points": 854,
+    "median_crashes_reference": 65.0,
+    "sites": 778,
+    "median_crashes_sites": 68.0,
+    "mean_percentile_sites": 53.73014033461166,
+    "share_above_borough_median_pct": 52.95629820051414
+   },
+   {
+    "borough": "Queens",
+    "reference_points": 3587,
+    "median_crashes_reference": 23.0,
+    "sites": 598,
+    "median_crashes_sites": 38.0,
+    "mean_percentile_sites": 64.1536046649318,
+    "share_above_borough_median_pct": 68.89632107023411
+   },
+   {
+    "borough": "Staten Island",
+    "reference_points": 1194,
+    "median_crashes_reference": 7.0,
+    "sites": 108,
+    "median_crashes_sites": 7.0,
+    "mean_percentile_sites": 54.82815311123519,
+    "share_above_borough_median_pct": 44.44444444444444
+   }
+  ],
+  "rq7_mean_percentile_by_type": {
+   "New Construction": 69.64873953723162,
+   "Preservation": 58.976440353542685
+  },
+  "rq9_adjusted_p": 0.1038961038961039,
+  "reported_zips": {
+   "rq1": {
+    "estimate": -0.17254309401500123,
+    "low": -0.6302300270031644,
+    "high": 0.3249644827961139
+   },
+   "rq2_stock": {
+    "estimate": 0.19760901885467058,
+    "low": -0.010474158344091572,
+    "high": 0.7403958562464477
+   },
+   "rq2_same_year": {
+    "estimate": -0.48730875217913694,
+    "low": -1.0671487572312828,
+    "high": -0.17664173882620676,
+    "adjusted_p": 0.05994005994005994
+   },
+   "rq2_same_year_all_zips": {
+    "estimate": -0.40066540602266937,
+    "low": -0.8165261393666581,
+    "high": -0.24919358107902348,
+    "adjusted_p": 0.01998001998001998
+   },
+   "rq9": {
+    "estimate": -0.20096321779528006,
+    "low": -0.39702816184611034,
+    "high": 0.004569605691676713,
+    "adjusted_p": 0.11988011988011989
+   }
+  },
+  "false_discovery_rate": 0.05,
+  "unscreened_variants": [
+   "Screen switched off: every candidate site",
+   "Only comparison sites screened",
+   "Screen off, without the most influential cluster",
+   "Inside cohort and borough, screen switched off",
+   "Inside cohort and borough, screen off, without that cluster"
+  ],
+  "largest_clusters": 3
+ },
+ "facts": {
+  "crash_index": 40.44995886252518,
+  "injury_index": 82.35216444023857,
+  "all_crash_change": -47.239116228641656,
+  "injury_change": -13.826751688094832,
+  "all_crash_difference": -2.226025828922063,
+  "sites": 7593,
+  "share_in_largest": 58.51442117740024,
+  "median_neighbours": 12.0,
+  "treated_candidates": 2086,
+  "treated_clean": 306,
+  "surplus_crashes": 10178,
+  "surplus_share_late": 95.61799960699548
+ },
+ "limits": {
+  "confidential_rows": 1949,
+  "confidential_row_share": 20.406240184273898,
+  "confidential_unit_share": 0.6297297054678312,
+  "same_day_share": 35.75588756647252,
+  "unlocated_share": 8.805613262782096,
+  "unlocated_share_first_year": 16.394512537364086,
+  "outside_panel_share": 8.002408418299193,
+  "imputed_zip_share": 28.32064829503261,
+  "no_factor_share": 24.500406055071966,
+  "headline_intervals": 10,
+  "robustness_intervals": 21
+ },
+ "stages": [
+  {
+   "stage": "raw",
+   "table": "housing, as loaded",
+   "rows": 9551
+  },
+  {
+   "stage": "raw",
+   "table": "crashes, as loaded",
+   "rows": 1504722
+  },
+  {
+   "stage": "cleaned",
+   "table": "housing: one row per project and building",
+   "rows": 9551
+  },
+  {
+   "stage": "cleaned",
+   "table": "crashes: one row per collision",
+   "rows": 1504722
+  },
+  {
+   "stage": "integrated",
+   "table": "zip_year: ZIP code by year",
+   "rows": 1710
+  },
+  {
+   "stage": "integrated",
+   "table": "sites: located buildings",
+   "rows": 7593
+  },
+  {
+   "stage": "integrated",
+   "table": "site_year: site by year",
+   "rows": 75930
+  },
+  {
+   "stage": "integrated",
+   "table": "event_panel: site by cohort by relative year",
+   "rows": 93618
+  },
+  {
+   "stage": "integrated",
+   "table": "crashes tagged with ZIP code and nearest site",
+   "rows": 1504722
+  }
+ ]
+}

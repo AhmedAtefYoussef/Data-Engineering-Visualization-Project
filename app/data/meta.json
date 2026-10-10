@@ -1,0 +1,151 @@
+{
+ "built_at": "2026-10-10 09:54 UTC",
+ "build_seconds": 65,
+ "datasets": {
+  "housing": {
+   "id": "hg8x-zxpr",
+   "name": "Affordable Housing Production by Building",
+   "url": "https://data.cityofnewyork.us/d/hg8x-zxpr"
+  },
+  "crashes": {
+   "id": "h9gi-nx95",
+   "name": "Motor Vehicle Collisions - Crashes",
+   "url": "https://data.cityofnewyork.us/d/h9gi-nx95"
+  }
+ },
+ "data_as_of": {
+  "raw_files_saved": {
+   "housing_hg8x-zxpr.csv": "2026-10-09",
+   "crashes_h9gi-nx95.csv.gz": "2026-10-09"
+  },
+  "latest_crash": "2025-12-31",
+  "earliest_crash": "2016-01-01",
+  "latest_housing_completion": "2026-08-21"
+ },
+ "rows": {
+  "housing": 9551,
+  "housing_located": 7593,
+  "housing_confidential": 1949,
+  "crashes": 1504722,
+  "injury_crashes": 409967,
+  "crashes_located": 1372222,
+  "crashes_near_a_site": 782969,
+  "sites": 7593,
+  "zip_year": 1710,
+  "panel_zips": 171,
+  "event_site_cohorts": 2175
+ },
+ "constants": {
+  "year_start": 2016,
+  "year_end": 2025,
+  "buffer_m": 250,
+  "event_window": 3,
+  "n_boot": 1000,
+  "ci_level": 0.95,
+  "min_group_n": 30,
+  "seed": 42,
+  "log_ratio_offset": 0.5,
+  "baseline_years": [
+   2016,
+   2018
+  ]
+ },
+ "dimensions": {
+  "boroughs": [
+   "Bronx",
+   "Brooklyn",
+   "Manhattan",
+   "Queens",
+   "Staten Island"
+  ],
+  "unknown_borough": "Unknown",
+  "construction_types": [
+   "New Construction",
+   "Preservation"
+  ],
+  "size_bands": [
+   "1-4",
+   "5-19",
+   "20-49",
+   "50-149",
+   "150+"
+  ],
+  "factor_groups": [
+   "Unspecified",
+   "Pedestrian or cyclist error",
+   "Road or environment",
+   "Vehicle defect",
+   "Impairment or medical",
+   "Distraction",
+   "Speed or aggressive driving",
+   "Failure to yield or obey",
+   "Improper manoeuvre",
+   "Other"
+  ],
+  "hour_bands": [
+   "Night",
+   "Morning",
+   "Afternoon",
+   "Evening"
+  ],
+  "hour_band_ranges": {
+   "Night": [
+    0,
+    5
+   ],
+   "Morning": [
+    6,
+    11
+   ],
+   "Afternoon": [
+    12,
+    17
+   ],
+   "Evening": [
+    18,
+    23
+   ]
+  },
+  "near_kinds": [
+   "Not near a site",
+   "New Construction | 1-4",
+   "New Construction | 5-19",
+   "New Construction | 20-49",
+   "New Construction | 50-149",
+   "New Construction | 150+",
+   "Preservation | 1-4",
+   "Preservation | 5-19",
+   "Preservation | 20-49",
+   "Preservation | 50-149",
+   "Preservation | 150+"
+  ],
+  "not_near": "Not near a site",
+  "event_outcomes": {
+   "injury": "injury_crashes",
+   "all": "crashes",
+   "pedcyc": "ped_cyc_crashes"
+  }
+ },
+ "grid": {
+  "lat_min": 40.45,
+  "lon_min": -74.3,
+  "lat_step": 0.0045,
+  "lon_step": 0.006,
+  "n_rows": 113,
+  "n_columns": 110
+ },
+ "files": {
+  "city_year.parquet": 7267,
+  "cleaning_log.parquet": 8762,
+  "crash_cube.parquet": 436260,
+  "event_sites.parquet": 65191,
+  "hour_cube.parquet": 735565,
+  "housing_cube.parquet": 18175,
+  "map_grid.parquet": 1238631,
+  "results.json": 16369,
+  "robustness.parquet": 14744,
+  "sites.parquet": 192446,
+  "zip_cube.parquet": 530057,
+  "zip_year.parquet": 54257
+ }
+}
