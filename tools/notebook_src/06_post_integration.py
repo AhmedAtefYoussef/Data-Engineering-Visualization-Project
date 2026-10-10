@@ -174,6 +174,39 @@ def cascade_label(cell_sizes):
 # find nothing left to recover. Stop with a clear message instead.
 assert "zip_imputed" not in crashes.columns, "6.1 has already run on this `crashes`; restart the kernel and run all"
 labelled = crashes.loc[crashes["is_located"] & crashes["zip"].notna(), ["lat", "lon", "zip", "borough"]]
+
+# A few reports carry a borough and ZIP that their own coordinates contradict, for example a
+# Brooklyn ZIP on a point in the west of Staten Island. On a highway where almost no other crash
+# reports a ZIP, one such report would teach the lookup a wrong ZIP for every crash around it.
+# They are found by comparing each report with its wider area and are not used as evidence.
+CONFLICT_CELL_DEGREES = 0.05     # about 5 km: wide enough to hold many reports even along highways
+CONFLICT_MIN_REPORTS = 200       # an area needs this many reports before it can contradict one
+CONFLICT_MIN_SHARE = 0.99        # and this share of them in one borough (areas on a border never reach it)
+
+
+def reports_contradicting_location(reports):
+    """True for reports whose borough differs from the one nearly every report in their area gives."""
+    with_borough = reports[reports["borough"].notna()]
+    area = (np.floor(with_borough["lat"] / CONFLICT_CELL_DEGREES).astype(int).astype(str) + "_"
+            + np.floor(with_borough["lon"] / CONFLICT_CELL_DEGREES).astype(int).astype(str))
+    counts = pd.crosstab(area.to_numpy(), with_borough["borough"].astype(str).to_numpy())
+    settled = (counts.sum(axis=1) >= CONFLICT_MIN_REPORTS) & (counts.max(axis=1) / counts.sum(axis=1) >= CONFLICT_MIN_SHARE)
+    area_borough = counts.idxmax(axis=1).where(settled)
+    expected = area.map(area_borough)
+    contradicts = expected.notna() & (expected != with_borough["borough"].astype(str))
+    return contradicts.reindex(reports.index, fill_value=False)
+
+
+# Kept as a Series on the crash index: later steps must not use these reports as evidence either.
+location_conflict = pd.Series(False, index=crashes.index)
+location_conflict.loc[labelled.index] = reports_contradicting_location(labelled).to_numpy()
+labelled = labelled[~location_conflict.loc[labelled.index].to_numpy()]
+log_rule("crashes", "reports whose borough and ZIP contradict their coordinates are not used to teach the ZIP lookup",
+         "flag", len(crashes), len(crashes), int(location_conflict.sum()),
+         "Their area has many reports and nearly all give another borough. The reported values are kept.")
+say(f"{int(location_conflict.sum()):,} reports give a borough that at least {100 * CONFLICT_MIN_SHARE:.0f}% of the "
+    f"reports in their area contradict. They keep what was reported and are left out of the evidence.")
+
 zip_targets = crashes["is_located"].to_numpy() & crashes["zip"].isna().to_numpy()
 target_lat = crashes["lat"].to_numpy()[zip_targets]
 target_lon = crashes["lon"].to_numpy()[zip_targets]
@@ -575,6 +608,106 @@ say(f"Borough was missing in {borough_missing_before:,} crashes before and is mi
     f"{int(fill_borough.sum()):,} values were filled. In the {int(zip_check_rows.sum())} crashes that reported a "
     f"borough and received a recovered ZIP, the recovered ZIP lies in the reported borough "
     f"{100 * recovery_agrees.mean():.1f}% of the time.")
+
+# %% [markdown]
+# One gap is left. A crash can have coordinates and still sit in a grid cell where no crash
+# reported a ZIP code, so the ZIP recovery never reaches it and its borough stays empty. The
+# cell below counts these crashes by where they are, because a gap that falls mostly on one
+# borough would understate that borough in every borough comparison.
+#
+# For these crashes the borough alone is decided by a vote of the nearest crashes that reported
+# one, within `BOROUGH_NEIGHBOUR_MAX_M`. A borough is a large area, so the neighbours of a crash
+# are nearly always in the same one. Taking only the single nearest crash was tried first and
+# rejected: a few reports carry the wrong borough, and on a highway where almost nothing else
+# is labelled one wrong report was copied to thousands of crashes around it. The cell checks
+# the vote by hiding the borough of a sample of reported crashes. The ZIP code is
+# left empty: ZIP areas are small, the nearest crash is often across a ZIP boundary, and the
+# ZIP panel is meant to hold only ZIP codes that were reported or recovered from a cell with
+# evidence. Dropping these crashes from borough comparisons was the alternative and would have
+# kept the uneven gap.
+
+# %%
+BOROUGH_NEIGHBOUR_MAX_M = 5_000     # farthest reported crash that may vote on a borough (metres)
+BOROUGH_VOTERS = 25                 # nearest reported crashes that vote; a few wrong reports cannot win
+BOROUGH_CHECK_SAMPLE = 20_000       # reported crashes whose borough is hidden to test the rule
+
+
+def majority_borough(tree, voter_codes, lat, lon, skip_self=False):
+    """Most common borough among the nearest reported crashes within the distance limit.
+
+    Returns one borough code per query point, or -1 where no reported crash is close enough.
+    A single nearest neighbour is not used because a handful of reports carry the wrong borough,
+    and on a highway where almost nothing else is labelled one wrong report would be copied to
+    every crash around it. A vote among BOROUGH_VOTERS neighbours outnumbers such reports.
+    """
+    extra = 1 if skip_self else 0          # a point queried against its own tree finds itself first
+    distance, neighbour = tree.query(to_radians(lat, lon), k=BOROUGH_VOTERS + extra)
+    distance, neighbour = distance[:, extra:], neighbour[:, extra:]
+    votes_allowed = distance * EARTH_RADIUS_M <= BOROUGH_NEIGHBOUR_MAX_M
+    neighbour_codes = voter_codes[neighbour]
+    tallies = np.stack([((neighbour_codes == code) & votes_allowed).sum(axis=1)
+                        for code in range(len(BOROUGHS))], axis=1)
+    return np.where(tallies.sum(axis=1) > 0, tallies.argmax(axis=1), -1)
+
+
+def borough_from_nearby_reports(crash_frame):
+    """Borough by neighbour vote for located crashes that still lack one.
+
+    Returns the positions of the crashes that receive a borough, the boroughs they receive, and
+    the share of a hidden sample of reported boroughs that the same vote predicts correctly.
+    """
+    lat = crash_frame["lat"].to_numpy()
+    lon = crash_frame["lon"].to_numpy()
+    located = crash_frame["is_located"].to_numpy()
+    # Only boroughs written on the police report vote, never filled ones, and never a report that
+    # its own coordinates contradict (found in 6.1.2).
+    assert location_conflict.index.equals(crash_frame.index)
+    reported = np.flatnonzero(located & crash_frame["borough"].notna().to_numpy()
+                              & ~crash_frame["borough_imputed"].to_numpy() & ~location_conflict.to_numpy())
+    lacking = np.flatnonzero(located & crash_frame["borough"].isna().to_numpy())
+    voter_codes = crash_frame["borough"].cat.codes.to_numpy()[reported]
+    tree = build_haversine_tree(lat[reported], lon[reported])
+
+    voted = majority_borough(tree, voter_codes, lat[lacking], lon[lacking])
+    receives = lacking[voted >= 0]
+    received = np.asarray(BOROUGHS, dtype=object)[voted[voted >= 0]]
+
+    # Check: hide the borough of a sample of reported crashes and let their neighbours vote.
+    sample = np.random.default_rng(SEED).choice(len(reported), size=min(BOROUGH_CHECK_SAMPLE, len(reported)),
+                                                replace=False)
+    predicted = majority_borough(tree, voter_codes, lat[reported[sample]], lon[reported[sample]], skip_self=True)
+    agreement = float((predicted == voter_codes[sample]).mean())
+    return receives, received, agreement
+
+
+located_without_borough = int((crashes["is_located"] & crashes["borough"].isna()).sum())
+neighbour_rows, neighbour_boroughs, neighbour_agreement = borough_from_nearby_reports(crashes)
+
+filled_borough = crashes["borough"].astype(object).to_numpy()
+filled_borough[neighbour_rows] = neighbour_boroughs
+crashes["borough"] = pd.Categorical(filled_borough, categories=BOROUGHS)
+borough_from_neighbour = np.zeros(len(crashes), dtype=bool)
+borough_from_neighbour[neighbour_rows] = True
+crashes["borough_imputed"] = crashes["borough_imputed"].to_numpy() | borough_from_neighbour
+borough_missing_final = int(crashes["borough"].isna().sum())
+
+# Every remaining gap is a crash with no coordinates or with no reported crash within the limit.
+assert borough_missing_final == borough_missing_after - len(neighbour_rows)
+
+log_rule("crashes", "borough of located crashes with no ZIP voted by the nearest reported crashes; flagged borough_imputed",
+         "impute", len(crashes), len(crashes), len(neighbour_rows),
+         f"Cells with no reported ZIP left an uneven gap by borough. Vote of the {BOROUGH_VOTERS} nearest "
+         f"reported crashes within {BOROUGH_NEIGHBOUR_MAX_M:,} m; the ZIP stays empty.")
+
+neighbour_share = (pd.Series(neighbour_boroughs).value_counts(normalize=True).mul(100).round(1)
+                   .reindex(BOROUGHS).fillna(0))
+display(neighbour_share.rename("% of the crashes filled from a neighbour").to_frame().T)
+say(f"{located_without_borough:,} located crashes still had no borough after the ZIP step. "
+    f"{len(neighbour_rows):,} of them take the borough that most of the {BOROUGH_VOTERS} nearest reported "
+    f"crashes within {BOROUGH_NEIGHBOUR_MAX_M:,} m carry, and {borough_missing_final:,} crashes "
+    f"({pct(borough_missing_final, len(crashes)):.1f}%) stay without one. On {BOROUGH_CHECK_SAMPLE:,} reported "
+    f"crashes with the borough hidden, the same vote gives the reported borough "
+    f"{100 * neighbour_agreement:.1f}% of the time.")
 
 # %% [markdown]
 # #### 6.2.2 Duplicate and leftover columns

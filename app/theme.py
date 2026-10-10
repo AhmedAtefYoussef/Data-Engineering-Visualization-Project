@@ -9,7 +9,15 @@ from __future__ import annotations
 
 import plotly.graph_objects as go
 
-FONT_STACK = '"Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif'
+# Type: an editorial pairing. Newsreader (a text-and-display serif drawn for news) sets the question,
+# the section headings and the headline figures; Public Sans (the plain civic sans of the US Web Design
+# System) sets body text, controls and every chart. Both come from Google Fonts with font-display: swap.
+# The "... Fallback" families are declared in site.css as local system fonts scaled to the same average
+# glyph width, so text does not reflow when the web fonts arrive.
+FONT_STACK = '"Public Sans", "Public Sans Fallback", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif'
+FONT_DISPLAY = '"Newsreader", "Newsreader Fallback", Georgia, "Times New Roman", serif'
+FONTS_URL = ("https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400..700"
+             "&family=Public+Sans:wght@400..700&display=swap")
 
 COLOR = {
     # surfaces and lines (cool neutrals, light theme only)
@@ -54,8 +62,9 @@ SEQUENTIAL = [[0.0, "#fdf0e6"], [0.2, "#fbd3b5"], [0.4, "#f5ac7a"], [0.6, "#e984
 
 SPACE = {"1": "0.25rem", "2": "0.5rem", "3": "0.75rem", "4": "1rem", "5": "1.5rem", "6": "2rem",
          "7": "3rem", "8": "4.5rem"}
+# One type scale, ratio about 1.2 below the headings and wider above them.
 TYPE = {"xs": "0.8125rem", "sm": "0.875rem", "base": "1rem", "md": "1.125rem", "lg": "1.375rem",
-        "xl": "1.75rem", "2xl": "2.375rem", "3xl": "3rem"}
+        "xl": "1.75rem", "2xl": "2.375rem", "3xl": "3.25rem", "4xl": "4rem"}
 RADIUS = "8px"
 SHADOW = "0 10px 28px rgb(17 26 34 / 0.14)"      # open dropdown menus
 SHADOW_RAISED = "0 1px 2px rgb(17 26 34 / 0.2), 0 6px 16px rgb(11 95 150 / 0.24)"   # the primary button only
@@ -64,6 +73,10 @@ SHADOW_RAISED = "0 1px 2px rgb(17 26 34 / 0.2), 0 6px 16px rgb(11 95 150 / 0.24)
 EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)"
 DURATION = {"fast": "120ms", "base": "200ms", "slow": "360ms"}
 CHART_FONT_SIZE = 13
+CHART_TICK_SIZE = 12
+# Chart toolbar: only "download as image" and "reset" stay on the charts (dragging still zooms and a
+# double click resets), so the toolbar is two quiet buttons and cannot sit on top of a legend.
+MODEBAR_REMOVE = ["zoom", "pan", "zoomin", "zoomout", "autoscale", "lasso", "select"]
 
 
 def css_variables() -> str:
@@ -73,7 +86,8 @@ def css_variables() -> str:
     lines += [f"--text-{name}: {value};" for name, value in TYPE.items()]
     lines += [f"--duration-{name}: {value};" for name, value in DURATION.items()]
     lines += [f"--radius: {RADIUS};", f"--shadow: {SHADOW};", f"--shadow-raised: {SHADOW_RAISED};",
-              f"--ease-out: {EASE_OUT};", f"--font: {FONT_STACK};", "color-scheme: light;"]
+              f"--ease-out: {EASE_OUT};", f"--font: {FONT_STACK};", f"--font-display: {FONT_DISPLAY};",
+              "color-scheme: light;"]
     return ":root {" + " ".join(lines) + "}"
 
 
@@ -82,21 +96,23 @@ def plotly_template() -> go.layout.Template:
     axis = {"gridcolor": COLOR["sunken"], "gridwidth": 1, "linecolor": COLOR["line-strong"],
             "zerolinecolor": COLOR["line-strong"], "zerolinewidth": 1, "ticks": "outside", "ticklen": 4,
             "tickcolor": COLOR["line-strong"], "automargin": True,
-            "title": {"font": {"size": CHART_FONT_SIZE, "color": COLOR["ink-2"]}, "standoff": 10},
-            "tickfont": {"size": 12, "color": COLOR["ink-3"]}}
+            "title": {"font": {"size": CHART_TICK_SIZE, "color": COLOR["ink-2"]}, "standoff": 12},
+            "tickfont": {"size": CHART_TICK_SIZE, "color": COLOR["ink-3"]}}
     return go.layout.Template(layout={
         "font": {"family": FONT_STACK, "size": CHART_FONT_SIZE, "color": COLOR["ink-2"]},
         "paper_bgcolor": COLOR["surface"], "plot_bgcolor": COLOR["surface"],
         "colorway": [COLOR["housing"], COLOR["crash"], COLOR["preservation"]],
-        "margin": {"l": 8, "r": 12, "t": 34, "b": 8},
+        "margin": {"l": 8, "r": 12, "t": 40, "b": 8},
         "xaxis": axis, "yaxis": axis,
-        "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.0, "xanchor": "left", "x": 0,
-                   "font": {"size": 12, "color": COLOR["ink-2"]}, "bgcolor": "rgba(0,0,0,0)",
+        "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "left", "x": 0,
+                   "font": {"size": CHART_TICK_SIZE, "color": COLOR["ink-2"]}, "bgcolor": "rgba(0,0,0,0)",
                    "itemsizing": "constant"},
         "hoverlabel": {"bgcolor": COLOR["surface"], "bordercolor": COLOR["line-strong"], "align": "left",
-                       "font": {"family": FONT_STACK, "size": 13, "color": COLOR["ink"]}},
-        # the zoom toolbar stays quiet until it is used
-        "modebar": {"bgcolor": "rgba(0,0,0,0)", "color": COLOR["line-strong"], "activecolor": COLOR["accent"]},
+                       "font": {"family": FONT_STACK, "size": CHART_FONT_SIZE, "color": COLOR["ink"]}},
+        "annotationdefaults": {"font": {"size": CHART_TICK_SIZE, "color": COLOR["ink-3"]}},
+        # the toolbar is quiet until it is used, and still passes 3:1 against the chart surface
+        "modebar": {"bgcolor": "rgba(252,253,253,0.9)", "color": COLOR["ink-3"], "activecolor": COLOR["accent"],
+                    "remove": MODEBAR_REMOVE},
         "separators": ".,",
         "hovermode": "closest",
         "dragmode": "zoom",

@@ -24,6 +24,7 @@ MAP_STYLE = "carto-positron"
 COLOR_CAP_PERCENTILE = 98          # the colour scale tops out here so a few extreme cells do not flatten the rest
 SITE_MARKER_RANGE = (3, 10)        # pixels: smallest and largest housing-site marker
 BAND_OPACITY = 0.14
+COLORBAR_LENGTH = 180              # pixels; a fixed length, see heatmap_figure
 FOREST_LIMIT = 30                  # percent; intervals reaching further are clipped and labelled
 FOREST_LABEL_WIDTH = 44            # characters per line of a row label, so the label column stays narrow
 
@@ -60,8 +61,8 @@ def map_figure(cells: pd.DataFrame, sites: pd.DataFrame, crash_noun: str, geojso
             geojson=geojson_url, featureidkey="id", locations=cells["cell"], z=cells["crashes"],
             zmin=0, zmax=cap, colorscale=SEQUENTIAL, marker={"opacity": 0.72, "line": {"width": 0}},
             colorbar={"title": {"text": "Crashes per<br>500 m cell", "font": {"size": 12}}, "thickness": 10,
-                      "len": 0.5, "x": 0.99, "xanchor": "right", "y": 0.08, "yanchor": "bottom",
-                      "bgcolor": _rgba(COLOR["surface"], 0.85), "tickfont": {"size": 11}},
+                      "lenmode": "pixels", "len": COLORBAR_LENGTH, "x": 0.99, "xanchor": "right", "y": 0.08, "yanchor": "bottom",
+                      "bgcolor": _rgba(COLOR["surface"], 0.9), "tickfont": {"size": 11}, "outlinewidth": 0},
             hovertemplate="%{z:,} " + crash_noun + "<br>in this 500 m cell<extra></extra>",
             name="Crash density", showlegend=False))
     if len(sites):
@@ -91,6 +92,7 @@ def map_figure(cells: pd.DataFrame, sites: pd.DataFrame, crash_noun: str, geojso
     figure.update_layout(
         showlegend=True,                 # also with one construction type, so the dots are always named
         map={"style": MAP_STYLE, "center": center, "zoom": zoom},
+        modebar={"remove": ["pan", "lasso", "select"]},      # the map keeps its zoom buttons (wheel zoom is off)
         legend={"y": 0.99, "yanchor": "top", "x": 0.01, "bgcolor": _rgba(COLOR["surface"], 0.9),
                 "bordercolor": COLOR["line"], "borderwidth": 1, "orientation": "v",
                 "title": {"text": "Housing sites (size = units)", "font": {"size": 12}}})
@@ -155,11 +157,17 @@ def heatmap_figure(matrix: np.ndarray, crash_noun: str) -> go.Figure:
     """Seven weekday rows by twenty-four hour columns, one hue from light to dark."""
     hours = [f"{hour:02d}" for hour in range(24)]
     spans = [[f"{day}, {hour:02d}:00 to {hour:02d}:59" for hour in range(24)] for day in WEEKDAYS]
-    figure = _figure(margin={"l": 8, "r": 8, "t": 12, "b": 8})
+    figure = _figure(margin={"l": 8, "r": 8, "t": 52, "b": 8})
     figure.add_trace(go.Heatmap(
         z=matrix, x=hours, y=WEEKDAYS, colorscale=SEQUENTIAL, zmin=0, xgap=2, ygap=2, customdata=spans,
-        colorbar={"thickness": 10, "len": 0.9, "title": {"text": "Crashes", "font": {"size": 12}},
-                  "tickfont": {"size": 11}, "tickformat": ","},
+        # The colour key lies above the plot with a length in pixels. A key sized as a fraction of the
+        # plot gets a negative length when the chart box is still a few pixels tall on first paint,
+        # and Plotly then fails with "Something went wrong with axis scaling".
+        colorbar={"orientation": "h", "lenmode": "pixels", "len": COLORBAR_LENGTH, "thickness": 8,
+                  "x": 0, "xanchor": "left", "y": 1.02, "yanchor": "bottom", "xpad": 0, "ypad": 0,
+                  "title": {"text": f"{crash_noun.capitalize()} per weekday and hour", "side": "top",
+                            "font": {"size": 12}},
+                  "tickfont": {"size": 11}, "tickformat": ",", "nticks": 5, "outlinewidth": 0},
         hovertemplate="%{customdata}<br>%{z:,} " + crash_noun + "<extra></extra>"))
     figure.update_xaxes(title_text="Hour of day", showgrid=False, ticks="", dtick=2, fixedrange=False)
     figure.update_yaxes(autorange="reversed", showgrid=False, ticks="")
@@ -189,14 +197,17 @@ def completions_figure(tables: dict[str, pd.DataFrame]) -> go.Figure:
 def scatter_figure(table: pd.DataFrame, crash_noun: str) -> go.Figure:
     """Units completed against crashes per year on two log axes; borough is in the hover text."""
     figure = _figure(margin={"l": 8, "r": 16, "t": 12, "b": 8})
+    # Zero cannot sit on a log axis, so those ZIP codes are drawn at 0.1; the hover keeps the true value.
+    true_rate = [f"{value:,.1f}" + (" (drawn at the axis floor of 0.1)" if value < 0.1 else "")
+                 for value in table["crashes_per_year"]]
     figure.add_trace(go.Scatter(
         x=table["affordable_units"], y=table["crashes_per_year"].clip(lower=0.1), mode="markers",
         marker={"size": 9, "color": _rgba(COLOR["ink-2"], 0.55), "line": {"color": COLOR["surface"], "width": 1}},
         customdata=np.column_stack([table["zip"], table["borough"], table["buildings"].astype(int),
-                                    table["crashes"]]),
+                                    table["crashes"], true_rate]),
         hovertemplate=("<b>ZIP %{customdata[0]}</b>, %{customdata[1]}<br>"
                        "%{x:,.0f} affordable units in %{customdata[2]} buildings<br>"
-                       "%{y:,.1f} " + crash_noun + " per year<extra></extra>")))
+                       "%{customdata[4]} " + crash_noun + " per year<extra></extra>")))
     figure.update_xaxes(type="log", title_text="Affordable units completed in the ZIP code (log scale)",
                         tickformat=",", dtick=1)
     figure.update_yaxes(type="log", title_text=f"{crash_noun.capitalize()} per year (log scale)",
@@ -250,17 +261,22 @@ def selection_figure(selection: dict) -> go.Figure:
     if selection.get("empty"):
         return empty_figure("Too few sites match this selection.")
     width = selection["bin_width"]
-    labels = [f"{start} to {start + width}" for start in range(0, 100, width)]
-    figure = _figure(bargap=0.18, margin={"l": 8, "r": 12, "t": 20, "b": 8})
+    starts = list(range(0, 100, width))
+    labels = [f"{start} to {start + width}" for start in starts]
+    figure = _figure(bargap=0, margin={"l": 8, "r": 12, "t": 20, "b": 8})
+    # Bars sit on a numeric axis from 0 to 100 with ticks at the bin edges. Ten "0 to 10" labels do not
+    # fit under ten bars on a phone; eleven short numbers do.
     figure.add_trace(go.Bar(
-        x=labels, y=selection["bin_share"], marker={"color": COLOR["housing"], "cornerradius": 3},
-        hovertemplate="Percentile %{x}<br>%{y:.1f}% of sites<extra></extra>", name="Housing sites"))
+        x=[start + width / 2 for start in starts], y=selection["bin_share"], width=width * 0.84,
+        customdata=labels, marker={"color": COLOR["housing"], "cornerradius": 3},
+        hovertemplate="Percentile %{customdata}<br>%{y:.1f}% of sites<extra></extra>", name="Housing sites"))
     figure.add_hline(y=width, line={"color": COLOR["ink-2"], "width": 1.5, "dash": "dot"})
     figure.add_annotation(x=0, xref="paper", y=width, xanchor="left", yanchor="bottom", showarrow=False,
-                          text=f" Typical streets: {width}% in every bar",
+                          text=f"Typical streets: {width}% in every bar", xshift=6, yshift=3, borderpad=2,
+                          bgcolor=_rgba(COLOR["surface"], 0.9),       # stays readable where it crosses a bar
                           font={"size": 12, "color": COLOR["ink-2"]})
-    figure.update_xaxes(title_text="Street percentile for injury crashes, 2016 to 2018 (higher = more crashes)",
-                        showgrid=False, tickangle=0, tickfont={"size": 11})
+    figure.update_xaxes(title_text="Street percentile for injury crashes, 2016 to 2018<br>(higher = more crashes)",
+                        showgrid=False, tickangle=0, range=[0, 100], tickvals=starts + [100], zeroline=False)
     figure.update_yaxes(title_text="Share of sites", ticksuffix="%", rangemode="tozero")
     return figure
 
@@ -299,7 +315,10 @@ def robustness_figure(table: pd.DataFrame) -> go.Figure:
     table = table[table["estimate"].notna()].reset_index(drop=True)      # a version with too few sites has no estimate
     labels = ["<br>".join(textwrap.wrap(f"{check}: {variant}", FOREST_LABEL_WIDTH))
               for check, variant in zip(table["check"], table["variant"])]
-    figure = _figure(margin={"l": 8, "r": 16, "t": 34, "b": 8})
+    # The legend hangs from the top left corner of the figure, not of the plot area: the long row labels
+    # leave the plot area too narrow for three legend entries in one row.
+    figure = _figure(margin={"l": 8, "r": 16, "t": 44, "b": 8},
+                     legend={"xref": "container", "x": 0.01, "yref": "container", "y": 0.995, "yanchor": "top"})
     figure.add_vline(x=0, line={"color": COLOR["line-strong"], "width": 1})
     for kind, (name, color, symbol) in kinds.items():
         rows = table[table["kind"] == kind]

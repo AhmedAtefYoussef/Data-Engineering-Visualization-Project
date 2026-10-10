@@ -1,6 +1,6 @@
 {
- "built_at": "2026-10-10 09:54 UTC",
- "build_seconds": 65,
+ "built_at": "2026-10-10 15:30 UTC",
+ "build_seconds": 71,
  "datasets": {
   "housing": {
    "id": "hg8x-zxpr",
@@ -15,8 +15,8 @@
  },
  "data_as_of": {
   "raw_files_saved": {
-   "housing_hg8x-zxpr.csv": "2026-10-09",
-   "crashes_h9gi-nx95.csv.gz": "2026-10-09"
+   "housing_hg8x-zxpr.csv": "2026-10-10",
+   "crashes_h9gi-nx95.csv.gz": "2026-10-10"
   },
   "latest_crash": "2025-12-31",
   "earliest_crash": "2016-01-01",
@@ -136,16 +136,16 @@
  },
  "files": {
   "city_year.parquet": 7267,
-  "cleaning_log.parquet": 8762,
-  "crash_cube.parquet": 436260,
+  "cleaning_log.parquet": 8940,
+  "crash_cube.parquet": 438147,
   "event_sites.parquet": 65191,
-  "hour_cube.parquet": 735565,
+  "hour_cube.parquet": 739333,
   "housing_cube.parquet": 18175,
-  "map_grid.parquet": 1238631,
-  "results.json": 16369,
+  "map_grid.parquet": 1233255,
+  "results.json": 16367,
   "robustness.parquet": 14744,
-  "sites.parquet": 192446,
-  "zip_cube.parquet": 530057,
-  "zip_year.parquet": 54257
+  "sites.parquet": 193295,
+  "zip_cube.parquet": 529787,
+  "zip_year.parquet": 54241
  }
 }

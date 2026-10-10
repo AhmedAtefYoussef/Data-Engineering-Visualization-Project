@@ -2,10 +2,10 @@
  "questions": {
   "RQ1": {
    "question": "Does knowing a ZIP's affordable-housing completions improve an out-of-time forecast of its injury crashes?",
-   "sentence": "The change in out-of-time forecast error from adding affordable-housing completions and stock is +0.59 injury crashes per ZIP per year (95% interval +0.16 to +1.10, n = 171 ZIP codes). The interval lies above zero, which fits a less accurate forecast.",
-   "estimate": 0.5922620530504297,
-   "low": 0.16069970409926138,
-   "high": 1.1006836826100905,
+   "sentence": "The change in out-of-time forecast error from adding affordable-housing completions and stock is +0.60 injury crashes per ZIP per year (95% interval +0.17 to +1.10, n = 171 ZIP codes). The interval lies above zero, which fits a less accurate forecast.",
+   "estimate": 0.5967994313399316,
+   "low": 0.17100561056991667,
+   "high": 1.1044564766096374,
    "level": 0.95,
    "adjusted_p": null,
    "n": 171,
@@ -20,9 +20,9 @@
   "RQ2": {
    "question": "Within a ZIP over time, do injury crashes move as the cumulative stock of completed affordable units grows?",
    "sentence": "The within-ZIP change in injury crashes as the stock of completed affordable units grows is +0.07 percent per 100 units (95% interval -0.06 to +0.41, n = 171 ZIP codes). The interval includes zero.",
-   "estimate": 0.07456526225755838,
-   "low": -0.05923402507992156,
-   "high": 0.4097027949312915,
+   "estimate": 0.07466307723339499,
+   "low": -0.05961933098578883,
+   "high": 0.4119217846981266,
    "level": 0.95,
    "adjusted_p": null,
    "n": 171,
@@ -104,10 +104,10 @@
   },
   "RQ7": {
    "question": "Before the project starts, are new-construction sites on streets with more injury crashes than typical street locations of the borough?",
-   "sentence": "The mean borough percentile of new-construction sites, before their project started, minus 50 is +19.65 percentile points (95% interval +16.30 to +22.75, n = 2,789 new-construction sites in 336 one-kilometre blocks). The interval lies above zero, which fits sites standing where there were already more injury crashes than at the typical street point of the borough.",
-   "estimate": 19.64873953723162,
-   "low": 16.30043499451772,
-   "high": 22.7539915518992,
+   "sentence": "The mean borough percentile of new-construction sites, before their project started, minus 50 is +19.90 percentile points (95% interval +16.56 to +22.99, n = 2,789 new-construction sites in 336 one-kilometre blocks). The interval lies above zero, which fits sites standing where there were already more injury crashes than at the typical street point of the borough.",
+   "estimate": 19.90361480213035,
+   "low": 16.560894113583625,
+   "high": 22.98897851777843,
    "level": 0.95,
    "adjusted_p": null,
    "n": 2789,
@@ -138,10 +138,10 @@
   },
   "RQ9": {
    "question": "Across ZIP codes, is the deep-affordable share associated with the pedestrian and cyclist share of harm?",
-   "sentence": "The within-borough rank correlation between the deep-affordable share and the pedestrian and cyclist share of injury crashes is -0.216 (95% interval -0.394 to -0.001, n = 123 ZIP codes in 5 boroughs). The interval excludes zero by 0.001, the p-value is 0.052 and 0.104 after adjustment for the two outcomes, so this is not counted as a difference from zero.",
-   "estimate": -0.21606125671886,
-   "low": -0.3935901529445867,
-   "high": -0.0012829508716681026,
+   "sentence": "The within-borough rank correlation between the deep-affordable share and the pedestrian and cyclist share of injury crashes is -0.215 (95% interval -0.392 to -0.000, n = 123 ZIP codes in 5 boroughs). The interval excludes zero by 0.000, the p-value is 0.052 and 0.104 after adjustment for the two outcomes, so this is not counted as a difference from zero.",
+   "estimate": -0.2146198164371769,
+   "low": -0.39236793224868427,
+   "high": -0.0002340128845033462,
    "level": 0.95,
    "adjusted_p": 0.1038961038961039,
    "n": 123,
@@ -207,125 +207,125 @@
   },
   "rq7": {
    "new": {
-    "estimate": 19.64873953723162,
-    "low": 16.30043499451772,
-    "high": 22.7539915518992,
+    "estimate": 19.90361480213035,
+    "low": 16.560894113583625,
+    "high": 22.98897851777843,
     "n": 2789,
     "units_resampled": 336,
-    "cluster_low": 9.949239529617774,
-    "cluster_high": 22.764245537853675
+    "cluster_low": 10.209750492969219,
+    "cluster_high": 22.98269765868795
    },
    "preservation": {
-    "estimate": 8.976440353542685,
-    "low": 4.819249986253087,
-    "high": 13.360344008434842,
+    "estimate": 9.444833563944535,
+    "low": 5.352056057550295,
+    "high": 13.77863680302686,
     "n": 2090,
     "units_resampled": 243,
-    "cluster_low": -1.1429978608310998,
-    "cluster_high": 16.98009250333885
+    "cluster_low": -0.7173512037515469,
+    "cluster_high": 17.27878083004681
    },
    "gap": {
-    "estimate": 10.672299183688935,
-    "low": 5.3897583781405345,
-    "high": 15.160048496723286,
+    "estimate": 10.458781238185814,
+    "low": 5.171565167009846,
+    "high": 14.97898662011534,
     "n": 4879,
     "units_resampled": 397,
-    "cluster_low": 3.702269666140863,
-    "cluster_high": 16.78139540203865
+    "cluster_low": 3.641538087585152,
+    "cluster_high": 16.522400240190297
    },
    "pooled": {
-    "estimate": 15.077084424727033,
-    "low": 12.107454159044657,
-    "high": 18.007304261311106,
+    "estimate": 15.423423617910558,
+    "low": 12.468069589648799,
+    "high": 18.33043381841211,
     "n": 4879,
     "units_resampled": 397,
-    "cluster_low": 5.05821522609944,
-    "cluster_high": 20.191327070007283
+    "cluster_low": 5.547848673601157,
+    "cluster_high": 20.443112680850827
    },
    "within_zip": {
-    "estimate": 8.633609594835633,
-    "low": 5.497036017346042,
-    "high": 11.267786974374477,
+    "estimate": 8.430284952221669,
+    "low": 5.231765707200558,
+    "high": 11.15519438822409,
     "n": 2662,
     "units_resampled": 304,
-    "cluster_low": 5.221662763915678,
-    "cluster_high": 12.106279752559878
+    "cluster_low": 4.970459364212915,
+    "cluster_high": 12.04890816741069
    },
    "gap_in_borough": {
-    "estimate": 8.252997369925218,
-    "low": 2.6030416234405527,
-    "high": 12.841841937283686,
+    "estimate": 8.19074947317661,
+    "low": 2.558497972579271,
+    "high": 12.772384259454347,
     "n": 4879,
     "units_resampled": 397,
-    "cluster_low": 2.7455898024160486,
-    "cluster_high": 17.504459788651467
+    "cluster_low": 2.6961400391150594,
+    "cluster_high": 17.413399661538143
    },
    "gap_within_zip": {
-    "estimate": 3.402982964375738,
-    "low": -0.8775598096364559,
-    "high": 7.892396183562216,
+    "estimate": 3.385614581023667,
+    "low": -0.877056468015397,
+    "high": 7.86436510340571,
     "n": 4253,
     "units_resampled": 359,
-    "cluster_low": -1.5350699070231617,
-    "cluster_high": 8.324622908086026
+    "cluster_low": -1.6029223278696314,
+    "cluster_high": 8.31800842634975
    }
   },
   "rq7_new_sites": {
-   "share_above_borough_median_pct": 79.20401577626389,
+   "share_above_borough_median_pct": 80.2438149874507,
    "median_baseline_crashes": 62.0,
-   "median_baseline_crashes_reference": 29.0,
-   "reference_points": 9543
+   "median_baseline_crashes_reference": 27.0,
+   "reference_points": 9986
   },
   "rq7_by_borough": [
    {
     "borough": "Bronx",
-    "reference_points": 1408,
+    "reference_points": 1432,
     "median_crashes_reference": 34.0,
     "sites": 1569,
     "median_crashes_sites": 55.0,
-    "mean_percentile_sites": 67.41177157569963,
-    "share_above_borough_median_pct": 76.67304015296367
+    "mean_percentile_sites": 67.80712904707478,
+    "share_above_borough_median_pct": 78.39388145315488
    },
    {
     "borough": "Brooklyn",
-    "reference_points": 2500,
+    "reference_points": 2519,
     "median_crashes_reference": 41.0,
     "sites": 1826,
     "median_crashes_sites": 64.0,
-    "mean_percentile_sites": 68.81417305585981,
-    "share_above_borough_median_pct": 79.29901423877328
+    "mean_percentile_sites": 68.99287213453765,
+    "share_above_borough_median_pct": 80.44906900328587
    },
    {
     "borough": "Manhattan",
-    "reference_points": 854,
-    "median_crashes_reference": 65.0,
+    "reference_points": 876,
+    "median_crashes_reference": 64.0,
     "sites": 778,
     "median_crashes_sites": 68.0,
-    "mean_percentile_sites": 53.73014033461166,
-    "share_above_borough_median_pct": 52.95629820051414
+    "mean_percentile_sites": 54.658869481517996,
+    "share_above_borough_median_pct": 54.62724935732648
    },
    {
     "borough": "Queens",
-    "reference_points": 3587,
-    "median_crashes_reference": 23.0,
+    "reference_points": 3615,
+    "median_crashes_reference": 22.0,
     "sites": 598,
     "median_crashes_sites": 38.0,
-    "mean_percentile_sites": 64.1536046649318,
+    "mean_percentile_sites": 64.32650096911327,
     "share_above_borough_median_pct": 68.89632107023411
    },
    {
     "borough": "Staten Island",
-    "reference_points": 1194,
+    "reference_points": 1544,
     "median_crashes_reference": 7.0,
     "sites": 108,
     "median_crashes_sites": 7.0,
-    "mean_percentile_sites": 54.82815311123519,
+    "mean_percentile_sites": 54.06172039915563,
     "share_above_borough_median_pct": 44.44444444444444
    }
   ],
   "rq7_mean_percentile_by_type": {
-   "New Construction": 69.64873953723162,
-   "Preservation": 58.976440353542685
+   "New Construction": 69.90361480213035,
+   "Preservation": 59.444833563944535
   },
   "rq9_adjusted_p": 0.1038961038961039,
   "reported_zips": {
@@ -346,9 +346,9 @@
     "adjusted_p": 0.05994005994005994
    },
    "rq2_same_year_all_zips": {
-    "estimate": -0.40066540602266937,
-    "low": -0.8165261393666581,
-    "high": -0.24919358107902348,
+    "estimate": -0.4003062597431413,
+    "low": -0.8182042022537188,
+    "high": -0.24864897052474547,
     "adjusted_p": 0.01998001998001998
    },
    "rq9": {
@@ -389,8 +389,8 @@
   "same_day_share": 35.75588756647252,
   "unlocated_share": 8.805613262782096,
   "unlocated_share_first_year": 16.394512537364086,
-  "outside_panel_share": 8.002408418299193,
-  "imputed_zip_share": 28.32064829503261,
+  "outside_panel_share": 8.080429474680372,
+  "imputed_zip_share": 28.25980707581478,
   "no_factor_share": 24.500406055071966,
   "headline_intervals": 10,
   "robustness_intervals": 21

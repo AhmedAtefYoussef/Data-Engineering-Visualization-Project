@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
@@ -550,3 +551,39 @@ def test_search_with_nothing_understood_leaves_the_dropdowns_alone(client):
     response = _callback(client, "search.value", {"search.value": "zzz qqq"})
     assert response["search-feedback"]["children"]
     assert not any(control_id in response for control_id in CONTROL_IDS)
+
+
+@pytest.mark.parametrize("query, term", [
+    ("not brooklyn", "brooklyn"), ("non-fatal", "fatal"), ("except queens", "queens"),
+    ("excluding 2020", "2020"), ("without pedestrians", "pedestrians"), ("not near housing", "near housing"),
+])
+def test_negated_terms_are_reported_and_never_applied(query, term):
+    parsed = parse_query(query)
+    assert parsed.values == {}
+    assert parsed.unmatched == [f"negation is not supported: {term}"]
+    assert parse_query("bronx not queens").values == {"boroughs": ["Bronx"]}
+
+
+@pytest.mark.parametrize("query", ["after 2025", "before 2016", "since 2030", "until 2015", "2015"])
+def test_year_phrases_outside_the_data_set_no_year_filter(query):
+    parsed = parse_query(query)
+    assert "year_from" not in parsed.values and "year_to" not in parsed.values
+    assert parsed.unmatched and "data covers 2016 to 2025" in parsed.unmatched[0]
+    assert parse_query("after 2024").values == {"year_from": 2025, "year_to": 2025}
+
+
+def test_conflicting_harm_terms_report_the_one_not_used():
+    parsed = parse_query("fatal pedestrians")
+    assert len(parsed.values["harm"]) and len(parsed.unmatched) == 1
+    assert "only one" in parsed.unmatched[0]
+    assert parse_query("pedestrians and cyclists").unmatched == []
+
+
+def test_scatter_hover_keeps_the_true_zero():
+    table = pd.DataFrame({"zip": ["10001", "10002"], "borough": ["Manhattan", "Bronx"],
+                          "buildings": [1, 2], "affordable_units": [10, 20], "crashes": [0, 5],
+                          "crashes_per_year": [0.0, 0.5]})
+    trace = charts.scatter_figure(table, "injury crashes").data[0]
+    assert list(trace.y) == [0.1, 0.5]
+    assert trace.customdata[0][4].startswith("0.0") and "axis floor" in trace.customdata[0][4]
+    assert trace.customdata[1][4] == "0.5"

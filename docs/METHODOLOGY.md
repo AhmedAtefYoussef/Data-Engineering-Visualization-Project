@@ -38,11 +38,11 @@ Section 6 repairs the gaps that the joins create. ZIP-years with crashes and no 
 
 ### ZIP recovery
 
-About a third of the crashes arrive without a ZIP code, and the share differs by year, so dropping them would bias the ZIP panel. Most of them have coordinates. The notebook learns ZIP areas from the crash table itself, without a boundary file. The city is cut into square cells of 0.001 degree, each cell takes the ZIP reported most often by the crashes inside it, and a crash without a ZIP takes its cell's ZIP. If the cell holds no labelled crash, a coarser cell of 0.004 degree is tried, and otherwise the ZIP stays missing. A random tenth of the crashes with a known ZIP was hidden to measure the method, and the chosen setting got 97.7% of them right. It filled 392,973 ZIP codes, and 115,949 crashes still have none. Recovered ZIPs are flagged, and results at ZIP level are repeated on reported ZIPs only (section 7).
+About a third of the crashes arrive without a ZIP code, and the share differs by year, so dropping them would bias the ZIP panel. Most of them have coordinates. The notebook learns ZIP areas from the crash table itself, without a boundary file. The city is cut into square cells of 0.001 degree, each cell takes the ZIP reported most often by the crashes inside it, and a crash without a ZIP takes its cell's ZIP. If the cell holds no labelled crash, a coarser cell of 0.004 degree is tried, and otherwise the ZIP stays missing. A random tenth of the crashes with a known ZIP was hidden to measure the method, and the chosen setting got 97.7% of them right. It filled 391,799 ZIP codes, and 117,123 crashes still have none. Before the lookup is learned, 441 reports whose borough is contradicted by at least 99% of the reports in their area are set aside as evidence, because one wrong report on a highway where little else is labelled would otherwise be copied to the crashes around it. A located crash that still has no ZIP takes its borough, and only its borough, from a vote of the 25 nearest reported crashes within 5 km (27,599 crashes). Recovered ZIPs are flagged, and results at ZIP level are repeated on reported ZIPs only (section 7).
 
 ## 4. Integration
 
-Level A is a ZIP by year panel. Housing is summed by completion year and crashes by crash year, each table is aggregated first, and the two aggregates are merged on ZIP and year. The panel is complete: 171 ZIP codes by 10 years, 1,710 rows, with zeros where a ZIP had no completion. It also carries the cumulative stock of units completed since 2014, so a ZIP's earlier buildings count. The panel covers 92.0% of the crashes.
+Level A is a ZIP by year panel. Housing is summed by completion year and crashes by crash year, each table is aggregated first, and the two aggregates are merged on ZIP and year. The panel is complete: 171 ZIP codes by 10 years, 1,710 rows, with zeros where a ZIP had no completion. It also carries the cumulative stock of units completed since 2014, so a ZIP's earlier buildings count. The panel covers 91.9% of the crashes.
 
 Level B is spatial. A crash is near a building if it lies within 250 m, roughly three short Manhattan blocks. Distances are great-circle distances (haversine), and a ball tree over the crashes finds all building and crash pairs within the radius. A brute-force check confirms the tree in the notebook.
 
@@ -68,18 +68,18 @@ An interval that includes zero is read as "the data cannot tell a difference fro
 
 | RQ | Method | Headline in the executed data |
 |---|---|---|
-| 1 | Linear regression forecasts of a ZIP's injury crashes, trained on 2018 to 2022 and scored on 2023 to 2025. Crash history alone against history plus completions or stock. | Adding housing raises the error by 0.59 injury crashes per ZIP-year (0.16 to 1.10, 171 ZIPs) |
+| 1 | Linear regression forecasts of a ZIP's injury crashes, trained on 2018 to 2022 and scored on 2023 to 2025. Crash history alone against history plus completions or stock. | Adding housing raises the error by 0.60 injury crashes per ZIP-year (0.17 to 1.10, 171 ZIPs) |
 | 2 | Two-way fixed effects (ZIP and year) of log injury crashes on the cumulative unit stock, plus a timing regression with leads (placebo) and lags of completions. | +0.07% per 100 units (-0.06 to +0.41, 171 ZIPs) |
 | 3 | Difference-in-differences of the log ratio at new-construction sites against comparison sites, cohort strata. | -4.6% (-11.9 to +3.3, 128 sites) |
 | 4 | Slope of the before and after change on the log of building units, with a Spearman check. | -1.1% per doubling of units (-4.7 to +2.2, 128 sites) |
 | 5 | The RQ3 contrast for new construction against preservation, as a ratio of ratios. | -8.1% (-19.6 to +4.9, 306 sites) |
 | 6 | Change in the pedestrian and cyclist share of injury crashes, completed against comparison sites, plus a table by borough. | +1.2 points (-1.1 to +3.4, 306 sites) |
-| 7 | Rank of each site's 2016 to 2018 injury crashes within 250 m among a grid of street reference points of its borough, for sites whose project started after 2018. Block resampling. | New construction +19.65 percentile points above the middle (16.30 to 22.75, 2,789 sites) |
+| 7 | Rank of each site's 2016 to 2018 injury crashes within 250 m among a grid of street reference points of its borough, for sites whose project started after 2018. Block resampling. | New construction +19.90 percentile points above the middle (16.56 to 22.99, 2,789 sites) |
 | 8 | The RQ6 design for four parts of the day (and 24 hours as a detail). | Largest gap +1.4 points, afternoon (-2.1 to +4.2) |
-| 9 | Spearman correlation across ZIP codes, within borough, between the share of deeply affordable units and the pedestrian and cyclist share of injury crashes. ZIPs with at least 50 affordable units. | -0.22 (-0.39 to -0.001, 123 ZIPs), adjusted p 0.10, not kept |
+| 9 | Spearman correlation across ZIP codes, within borough, between the share of deeply affordable units and the pedestrian and cyclist share of injury crashes. ZIPs with at least 50 affordable units. | -0.22 (-0.39 to 0.00, 123 ZIPs), adjusted p 0.10, not kept |
 | 10 | The RQ6 design for nine contributing-factor groups. | Largest gap -0.8 points, impairment or medical (-2.8 to +0.7) |
 
-Three of the ten intervals exclude zero: RQ1, RQ7 and RQ9. RQ9 misses zero by 0.001 and does not survive the adjustment for its two outcomes, so the notebook calls it a hint.
+Three of the ten intervals exclude zero: RQ1, RQ7 and RQ9. The RQ9 interval ends at zero and the result does not survive the adjustment for its two outcomes, so the notebook calls it a hint.
 
 RQ7 asks where the buildings are, not what they do. Its benchmark is a grid of street points and not other housing, and apartment buildings of any kind stand on dense blocks, so the result does not show that the programme picks more dangerous streets than other housing would.
 

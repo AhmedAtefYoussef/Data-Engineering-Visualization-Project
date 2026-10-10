@@ -14,7 +14,7 @@ from dash import html
 from app import charts, data
 from app.data import MIN_GROUP_N, Store
 from app.filters import (BUFFER_M, Filters, chips, crash_scope_text, housing_kind_text, housing_scope_text,
-                         place_text, year_text)
+                         nearest_site_text, place_text, year_text)
 from app.story import signed
 
 GEOJSON_URL = "/data/crash-grid.geojson"
@@ -156,7 +156,8 @@ def _scatter_panel(store: Store, filters: Filters) -> Panel:
                 "expected whatever housing does. The chart compares places with each other and says nothing "
                 "about change over time. ")
     if relation["n_without_units"]:
-        note.append(f"{relation['n_without_units']} ZIP codes without matching housing are not drawn.")
+        note.append(f"{relation['n_without_units']} ZIP codes without matching housing are not drawn. ")
+    note.append("ZIP codes with zero crashes are drawn at the axis floor (0.1); the hover shows the true value.")
     return Panel(charts.scatter_figure(table, filters.harm_noun), scope, note)
 
 
@@ -232,11 +233,12 @@ def summary_tiles(filters: Filters, numbers: dict) -> list:
     """The four numbers above the charts."""
     anywhere = numbers["crashes_anywhere"]
     near_share = f"{numbers['crashes_near'] / anywhere * 100:.0f}%" if anywhere else "n/a"
-    place = "near the selected housing" if filters.scope == "near" else place_text(filters)
+    place = "within 250 m of housing" if filters.scope == "near" else place_text(filters)
+    kind = nearest_site_text(filters)
     return [
         _tile(f"{numbers['crashes']:,}", filters.harm_noun.capitalize(), f"{place}, {year_text(filters)}"),
-        _tile(near_share, f"of matching crashes are within {BUFFER_M} m of housing",
-              f"{numbers['crashes_near']:,} of {anywhere:,}; {housing_kind_text(filters)}"),
+        _tile(near_share, f"of matching crashes are within {BUFFER_M} m of a housing site (completed or planned)",
+              f"{numbers['crashes_near']:,} of {anywhere:,}; {kind}"),
         _tile(f"{numbers['buildings']:,}", "Affordable-housing buildings completed",
               f"{numbers['buildings_unlocated']:,} without a public address"),
         _tile(f"{numbers['affordable_units']:,}", "Affordable units in those buildings",
