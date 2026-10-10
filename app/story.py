@@ -185,6 +185,24 @@ def _finding_extras(store: Store) -> dict[str, str]:
     }
 
 
+def _interval_level_text(questions: dict) -> str:
+    """Which interval level the bars show, read from each stored result."""
+    levels = sorted({item["level"] for item in questions.values()})
+    if len(levels) == 1:
+        return f"The bar shows the {levels[0]:.0%} interval."
+    return ("Each bar shows the interval at the level printed beside it ("
+            + ", ".join(f"{level:.0%}" for level in levels) + ", depending on the question).")
+
+
+def _zip_level_text(store: Store) -> str:
+    """'Three of the ZIP-level results (RQ1, RQ2 and RQ9)', from the questions stored under reported ZIP codes."""
+    keys = sorted({key.split("_")[0].upper() for key in store.results["detail"]["reported_zips"]},
+                  key=lambda key: int(key[2:]))
+    names = keys[0] if len(keys) == 1 else ", ".join(keys[:-1]) + " and " + keys[-1]
+    count = {1: "One", 2: "Two", 3: "Three", 4: "Four", 5: "Five"}.get(len(keys), str(len(keys)))
+    return f"{count} of the ZIP-level results ({names})"
+
+
 def _findings_lead(questions: dict) -> str:
     """How many intervals include zero, which exclude it, and which of those are not kept."""
     excluding = [key for key, item in questions.items() if item["excludes_zero"]]
@@ -211,8 +229,8 @@ def findings(store: Store) -> html.Section:
     return html.Section(id="findings", className="band", children=[
         html.H2("Ten questions and what the records show"),
         html.P(_findings_lead(questions), className="section-lead"),
-        html.P("The bar shows the 95% interval. If it crosses the vertical zero line, the records are compatible "
-               "with no change.", className="section-lead"),
+        html.P(f"{_interval_level_text(questions)} If it crosses the vertical zero line, the records are "
+               "compatible with no change.", className="section-lead"),
         html.Ul([_finding_row(key, item, extras.get(key)) for key, item in questions.items()], className="findings"),
         html.H3("What surprised us", className="sub-heading"),
         html.P(f"Before any question, we checked how the total count behaves. Counted as all crashes, the streets "
@@ -271,7 +289,7 @@ def limits(store: Store) -> html.Section:
          f"{limit['confidential_unit_share']:.2f}% of the units and appear only in borough totals."),
         ("Recovered ZIP codes",
          f"{limit['imputed_zip_share']:.1f}% of the crashes in the ZIP panel carry a ZIP code recovered from "
-         f"their coordinates. {recovery_check} Three of the ZIP-level results (RQ1, RQ2 and RQ9) change when the "
+         f"their coordinates. {recovery_check} {_zip_level_text(store)} change when the "
          "recovered codes are left out. Each is marked under its finding above."),
         ("No traffic volumes",
          "We count crashes. Nothing says how many people or vehicles used a street, so a count is not a risk "

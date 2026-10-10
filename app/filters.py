@@ -41,7 +41,7 @@ DEFAULT_HARM = "injury"
 # Where the crash happened relative to the housing sites (the spatial join of the two datasets).
 SCOPE = {
     "city": "Anywhere in the city",
-    "near": "Within 250 m of the selected housing",
+    "near": "Within 250 m of housing (nearest site matches the housing filters)",
 }
 DEFAULT_SCOPE = "city"
 BUFFER_M = 250
@@ -153,8 +153,18 @@ def crash_scope_text(filters: Filters) -> str:
     if filters.hours:
         parts.append("time: " + ", ".join(filters.hours).lower())
     if filters.scope == "near":
-        parts.append(f"within {BUFFER_M} m of " + housing_kind_text(filters))
+        parts.append(nearest_site_text(filters))
     return " · ".join(parts)
+
+
+def nearest_site_text(filters: Filters) -> str:
+    """Wording for the crash-location filter. Only the nearest site's kind is stored, so say exactly that."""
+    if not filters.has_housing_filter:
+        return f"within {BUFFER_M} m of an affordable-housing site"
+    kind = " or ".join(filters.construction).lower() if filters.construction else ""
+    size = ("with " + ", ".join(filters.sizes) + " units") if filters.sizes else ""
+    wanted = " ".join(part for part in (kind, size) if part)
+    return f"nearest affordable-housing site within {BUFFER_M} m is {wanted}"
 
 
 def housing_kind_text(filters: Filters) -> str:

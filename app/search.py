@@ -164,7 +164,9 @@ def _take_years(text: str) -> tuple[tuple[int, int] | None, str | None, str, boo
     for pattern, to_range in patterns:
         match = re.search(pattern, text)
         if match:
-            first, last = sorted(to_range(match))
+            first, last = to_range(match)
+            if pattern in (patterns[0][0], patterns[-1][0]):    # "2020-2018" is the same range as "2018-2020"
+                first, last = sorted((first, last))
             typed = match.group(0).strip()
             blanked = text[:match.start()] + " " + text[match.end():]
             if pattern == patterns[-1][0]:                   # a second bare year closes the range
@@ -173,8 +175,8 @@ def _take_years(text: str) -> tuple[tuple[int, int] | None, str | None, str, boo
                     first, last = sorted((first, int(other[1])))
                     typed = f"{typed} {other.group(0).strip()}"
                     blanked = blanked[:other.start()] + " " + blanked[other.end():]
-            if last < YEAR_START or first > YEAR_END:      # a year outside the data sets nothing
-                return None, None, text, False
+            if first > last or last < YEAR_START or first > YEAR_END:   # outside the data: set nothing
+                return None, typed, blanked, False
             clamped = first < YEAR_START or last > YEAR_END
             return (_clamp(first), _clamp(last)), typed, blanked, clamped
     return None, None, text, False
@@ -217,12 +219,34 @@ def _correct_spelling(parsed: ParsedQuery, leftover: list[str]) -> list[str]:
     return still_unmatched
 
 
+_NEGATION = r"(?<![\w-])(?:not|no|non|except|excluding|exclude|without)(?:-|\s+)"
+_YEAR_TERM = r"(?:19|20)\d{2}(?:\s*(?:-|–|—|to)\s*(?:19|20)\d{2})?"
+
+
+def _negated_terms(text: str) -> tuple[str, list[str]]:
+    """Remove each negation word and the term after it. Negation is never applied, only reported."""
+    tables = [BOROUGH_WORDS, FACTOR_WORDS, HOUR_WORDS, CONSTRUCTION_WORDS, HARM_WORDS, SIZE_WORDS, SCOPE_WORDS]
+    phrases = sorted({phrase for table in tables for phrase in table}, key=len, reverse=True)
+    term = rf"(?:{_YEAR_TERM}|{'|'.join(re.escape(phrase) for phrase in phrases)}|[a-z0-9+]+)"
+    pattern = re.compile(rf"{_NEGATION}({term}(?:\s+(?:or|and|nor)\s+{term})*)(?![\w+])")
+    reported = []
+    while True:
+        match = pattern.search(text)
+        if not match:
+            return text, reported
+        reported.append(f"negation is not supported: {match.group(1)}")
+        text = text[:match.start()] + " " + text[match.end():]
+
+
 def parse_query(text: str | None) -> ParsedQuery:
     """Parse a free-text query into control values, the pieces understood and the words left over."""
     parsed = ParsedQuery(text=text or "")
     remaining = " " + re.sub(r"[,;:!?()\"']", " ", (text or "").lower()) + " "
 
+    remaining, notes = _negated_terms(remaining)
     years, typed, remaining, clamped = _take_years(remaining)
+    if typed and not years:
+        notes.append(f"{typed}: the data covers {YEAR_START} to {YEAR_END}")
     if years:
         parsed.values["year_from"], parsed.values["year_to"] = years
         shown = str(years[0]) if years[0] == years[1] else f"{years[0]} to {years[1]}"
@@ -263,14 +287,17 @@ def parse_query(text: str | None) -> ParsedQuery:
         kinds = {value for _, value in harm_found}
         # pedestrians and cyclists together are one option; otherwise the first road user named wins
         if {"ped", "cyc"} <= kinds:
-            harm = "pedcyc"
+            harm, used = "pedcyc", {"ped", "cyc"}
         else:
             harm = next(value for _, value in harm_found if value in kinds)
+            used = {harm}
         parsed.values["harm"] = harm
-        typed = " + ".join(dict.fromkeys(phrase for phrase, _ in harm_found))
+        typed = " + ".join(dict.fromkeys(phrase for phrase, value in harm_found if value in used))
         parsed.understood.append((typed, LABELS["harm"], HARM[harm]["label"].replace(" (see note)", "")))
+        for phrase in dict.fromkeys(phrase for phrase, value in harm_found if value not in used):
+            notes.append(f"{phrase}: only one 'who was harmed' option applies at a time")
 
     words = re.findall(r"[a-z0-9+'-]+", remaining)
     leftover = list(dict.fromkeys(word for word in words if word not in STOP_WORDS and word.strip("-'+")))
-    parsed.unmatched = _correct_spelling(parsed, leftover)
+    parsed.unmatched = notes + _correct_spelling(parsed, leftover)
     return parsed

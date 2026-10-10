@@ -434,5 +434,5 @@ def _site_selection(store: Store, boroughs: tuple, construction: tuple, sizes: t
 
 def near_text(filters: Filters) -> str:
     """'within 250 m of ...' for captions."""
-    from app.filters import housing_kind_text
-    return f"within {BUFFER_M} m of {housing_kind_text(filters)}"
+    from app.filters import nearest_site_text
+    return nearest_site_text(filters)

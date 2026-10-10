@@ -16,7 +16,7 @@ Every result is an association. Housing sites are not chosen at random and neigh
 
 No. A forecast built only on the ZIP code's own crash history was already as good as we could get, and adding housing made it slightly worse.
 
-How we measured it: for 171 ZIP codes we trained a model on the earlier years and tested it on 2023 to 2025, which it had never seen. One version used the last two years of injury crashes. The other also used completed units and the stock of units built so far. We compared the average miss of each version. The housing version missed by 0.59 more injury crashes per ZIP code per year (95% interval 0.16 to 1.10), on a base of about 20. When we kept only crashes whose ZIP code was reported by the police, the difference disappeared (−0.17, interval −0.63 to +0.32).
+How we measured it: for 171 ZIP codes we trained a model on the earlier years and tested it on 2023 to 2025, which it had never seen. One version used the last two years of injury crashes. The other also used completed units and the stock of units built so far. We compared the average miss of each version. The housing version missed by 0.60 more injury crashes per ZIP code per year (95% interval 0.17 to 1.10), on a base of about 20. When we kept only crashes whose ZIP code was reported by the police, the difference disappeared (−0.17, interval −0.63 to +0.32).
 
 What it means for the city: last year's crashes are the best guide to next year's. A planner who wants to know where injuries will happen does not gain anything by adding affordable-housing completions to the forecast.
 
@@ -70,7 +70,7 @@ What it means for the city: more residents usually means more people on foot. Th
 
 Yes, and this is the clearest result of the project.
 
-How we measured it: we took sites whose project started after 2018 and counted injury crashes within 250 metres in 2016 to 2018, before anything was built. We ranked each site against a grid of street points in the same borough. A typical street point sits at the 50th percentile. New-construction sites sit near the 70th, which is 19.7 points higher (interval 16.3 to 22.8, 2,789 sites). About 79% of them are above their borough's middle, with a median of 62 nearby injury crashes against 29 at a typical street point. Ranked inside their own ZIP code they are still 8.6 points above the middle.
+How we measured it: we took sites whose project started after 2018 and counted injury crashes within 250 metres in 2016 to 2018, before anything was built. We ranked each site against a grid of street points in the same borough. A typical street point sits at the 50th percentile. New-construction sites sit near the 70th, which is 19.9 points higher (interval 16.6 to 23.0, 2,789 sites). About 80% of them are above their borough's middle, with a median of 62 nearby injury crashes against 27 at a typical street point. Ranked inside their own ZIP code they are still 8.4 points above the middle.
 
 What it means for the city: apartment buildings go up on busy corridors, where crashes are also concentrated. Residents of new affordable housing move onto streets that were already more dangerous than average. This describes where the buildings stand. It does not show that the programme picks worse streets than market-rate housing would, because renovated buildings also rank above the middle and we have no market-rate data. For the transportation department, planned housing sites are a reasonable list of places to check for safety work before people move in.
 
@@ -88,7 +88,7 @@ What it means for the city: there is no sign that completions move crashes towar
 
 There is a hint, and we do not count it as a finding.
 
-How we measured it: for 123 ZIP codes with at least 50 affordable units we computed the share of units reserved for the lowest incomes and the share of injury crashes that hurt a pedestrian or cyclist. We compared ZIP codes only within the same borough, so that Manhattan against Staten Island does not drive the result. The rank correlation is −0.22 (interval −0.39 to −0.001). The interval misses zero by a hair, the p-value is 0.10 after correcting for the two outcomes we looked at, and on reported ZIP codes alone the interval includes zero.
+How we measured it: for 123 ZIP codes with at least 50 affordable units we computed the share of units reserved for the lowest incomes and the share of injury crashes that hurt a pedestrian or cyclist. We compared ZIP codes only within the same borough, so that Manhattan against Staten Island does not drive the result. The rank correlation is −0.22 (interval −0.39 to 0.00). The interval ends at zero, the p-value is 0.10 after correcting for the two outcomes we looked at, and on reported ZIP codes alone the interval includes zero.
 
 What it means for the city: we cannot say that the lowest-income housing sits in places with more or less pedestrian harm. The question is worth asking again with better exposure data, such as counts of people walking.
 

@@ -19,7 +19,7 @@ from app.callbacks import register, report_outputs
 from app.filters import make_filters
 from app.layout import build_layout, missing_data_layout
 from app.report import GEOJSON_URL
-from app.theme import css_variables
+from app.theme import COLOR, FONTS_URL, css_variables
 
 TITLE = "Affordable housing and injury crashes in NYC"
 DESCRIPTION = ("An interactive report on affordable-housing buildings and police crash reports in "
@@ -44,6 +44,11 @@ app.index_string = """<!DOCTYPE html>
 {%metas%}
 <title>{%title%}</title>
 {%favicon%}
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<meta name="theme-color" content='""" + COLOR["surface"] + """'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href='""" + FONTS_URL + """'>
 <style id="design-tokens">""" + css_variables() + """</style>
 {%css%}
 </head>
