@@ -48,9 +48,20 @@ def _options(values: list[str], labels: dict | None = None) -> list[dict]:
     return [{"label": (labels or {}).get(value, value), "value": value} for value in values]
 
 
-def _field(label: str, control_id: str, control, help_text: str | None = None, wide: bool = False) -> html.Div:
-    """A labelled control. The label is tied to the control so a click or a screen reader finds it."""
-    children = [html.Label(label, htmlFor=control_id, className="field-label", id=f"{control_id}-label"), control]
+OPTION_HEIGHT_PX = 44            # one menu row: a comfortable click and touch target
+MENU_ROWS_VISIBLE = 7            # rows shown before the menu scrolls
+MULTI_NOTE = "choose one or more"
+
+
+def _field(label: str, control_id: str, control, help_text: str | None = None, wide: bool = False,
+           note: str | None = None) -> html.Div:
+    """A labelled control. The label is tied to the control so a click or a screen reader finds it.
+
+    `note` is a short qualifier shown beside the label, used to say that a filter takes several values.
+    """
+    label_children = [label, html.Span(note, className="field-note")] if note else label
+    children = [html.Label(label_children, htmlFor=control_id, className="field-label", id=f"{control_id}-label"),
+                control]
     if help_text:
         children.append(html.P(help_text, className="field-help"))
     # role="group" names the control for assistive technology even where the script in
@@ -59,10 +70,17 @@ def _field(label: str, control_id: str, control, help_text: str | None = None, w
                     **{"aria-labelledby": f"{control_id}-label"})
 
 
-def _dropdown(control_id: str, options: list[dict], value=None, multi: bool = True, placeholder: str = "All"):
+def _dropdown(control_id: str, options: list[dict], value=None, multi: bool = True, placeholder: str = "All",
+              searchable: bool = False):
+    """One filter dropdown.
+
+    A multi-value menu stays open after a pick, so several values take one visit. Typing to narrow
+    the list is switched on only where the list is long, because on a phone it opens the keyboard.
+    """
     return dcc.Dropdown(id=control_id, options=options, value=value if value is not None else ([] if multi else None),
-                        multi=multi, clearable=multi, searchable=False, placeholder=placeholder,
-                        className="dropdown", persistence=False)
+                        multi=multi, clearable=multi, searchable=searchable, placeholder=placeholder,
+                        closeOnSelect=not multi, optionHeight=OPTION_HEIGHT_PX,
+                        maxHeight=OPTION_HEIGHT_PX * MENU_ROWS_VISIBLE, className="dropdown", persistence=False)
 
 
 def controls() -> html.Div:
@@ -72,9 +90,19 @@ def controls() -> html.Div:
     harm_labels = {key: item["label"] for key, item in HARM.items()}
     search = html.Div(className="search", children=[
         html.Label("Search", htmlFor="search", className="field-label"),
-        dcc.Input(id="search", type="search", debounce=False, value="", className="search-input",
-                  placeholder="Type a place, a period and what you want to see", autoComplete="off",
-                  spellCheck=False, n_submit=0),
+        html.Div(className="search-box", children=[
+            dcc.Input(id="search", type="search", debounce=False, value="", className="search-input",
+                      placeholder="Type a place, a period and what you want to see", autoComplete="off",
+                      spellCheck=False, n_submit=0),
+            # The clear button and the key hint share one row on the right of the field, so the gap
+            # between them is set in one place. assets/site.js empties the field when the button is pressed.
+            html.Div(className="search-tools", children=[
+                html.Button("\u00d7", id="search-clear", className="search-clear", type="button", n_clicks=0,
+                            title="Clear the search", **{"aria-label": "Clear the search"}),
+                html.Span(["Press ", html.Kbd("Enter"), " to generate"], className="search-key",
+                          **{"aria-hidden": "true"}),
+            ]),
+        ]),
         html.P(["Try ", *[html.Button(text, id=f"example-{position}", className="example",
                                       n_clicks=0, type="button")
                           for position, text in enumerate(EXAMPLE_QUERIES)]], className="examples"),
@@ -82,17 +110,22 @@ def controls() -> html.Div:
                  **{"aria-live": "polite"}),
     ])
     filters = html.Div(className="fields", children=[
-        _field("Borough", "f-borough", _dropdown("f-borough", _options(BOROUGHS), placeholder="All five")),
+        _field("Borough", "f-borough", _dropdown("f-borough", _options(BOROUGHS), placeholder="All five"), note=MULTI_NOTE),
         _field("From year", "f-year-from", _dropdown("f-year-from", _options(YEARS), YEAR_START, multi=False)),
         _field("To year", "f-year-to", _dropdown("f-year-to", _options(YEARS), YEAR_END, multi=False)),
         _field("Construction type", "f-construction",
-               _dropdown("f-construction", _options(CONSTRUCTION_TYPES), placeholder="Both types")),
-        _field("Building size", "f-size", _dropdown("f-size", _options(SIZE_BANDS, size_labels), placeholder="Any size")),
+               _dropdown("f-construction", _options(CONSTRUCTION_TYPES), placeholder="Both types"), note=MULTI_NOTE),
+        _field("Building size", "f-size", _dropdown("f-size", _options(SIZE_BANDS, size_labels), placeholder="Any size"),
+               note=MULTI_NOTE),
         _field("Contributing factor", "f-factor",
-               _dropdown("f-factor", _options(FACTOR_GROUPS), placeholder="Any factor")),
-        _field("Time of day", "f-hour", _dropdown("f-hour", _options(HOUR_BANDS, hour_labels), placeholder="Any time")),
+               _dropdown("f-factor", _options(FACTOR_GROUPS), placeholder="Any factor", searchable=True),
+               note=MULTI_NOTE),
+        _field("Time of day", "f-hour", _dropdown("f-hour", _options(HOUR_BANDS, hour_labels), placeholder="Any time"),
+               note=MULTI_NOTE),
         _field("Who was harmed", "f-harm", _dropdown("f-harm", _options(list(HARM), harm_labels), DEFAULT_HARM, multi=False)),
-        _field("Crash location", "f-scope", _dropdown("f-scope", _options(list(SCOPE), SCOPE), DEFAULT_SCOPE, multi=False)),
+        # The option labels are kept short enough to fit the control; the qualifier sits under it.
+        _field("Crash location", "f-scope", _dropdown("f-scope", _options(list(SCOPE), SCOPE), DEFAULT_SCOPE, multi=False),
+               help_text="Near housing: the housing filters apply to each crash's nearest site."),
     ])
     actions = html.Div(className="actions", children=[
         html.Button("Generate report", id="generate", n_clicks=0, className="button button-primary",

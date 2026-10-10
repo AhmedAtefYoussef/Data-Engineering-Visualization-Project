@@ -111,6 +111,18 @@
     refresh();
   }
 
+  // The clear button in the search field. Dash owns the input's value through React, so the value
+  // is set with the native setter and announced with an input event; Dash then parses the empty
+  // query like any other and resets the feedback line.
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest ? event.target.closest("#search-clear") : null;
+    var input = document.getElementById("search");
+    if (!button || !input) { return; }
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(input, "");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+  });
+
   // Dash may add this file after the document has finished loading, so do not rely on the event alone.
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", start);

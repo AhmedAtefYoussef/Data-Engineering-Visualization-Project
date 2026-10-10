@@ -119,22 +119,53 @@ main { display: block; }
 /* ---------- controls ---------- */
 .band-explore { background: var(--color-page); }
 .controls {
+  position: relative; z-index: 2;      /* an open menu overlaps the report below and must stay on top */
   background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius);
   padding: var(--space-5) var(--space-5) 0;
 }
-.field-label { display: block; margin-bottom: var(--space-2); color: var(--color-ink); font-size: var(--text-sm); font-weight: 650; line-height: 1.3; }
+/* A label stays on one line (the note is cut short before it wraps), so the controls in a row line up. */
+.field-label {
+  display: block; margin-bottom: var(--space-2); color: var(--color-ink); font-size: var(--text-sm); font-weight: 650; line-height: 1.3;
+  height: 1.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .field-help { margin-top: var(--space-1); color: var(--color-ink-3); font-size: var(--text-xs); }
+.field-note { margin-left: var(--space-2); color: var(--color-ink-3); font-size: var(--text-xs); font-weight: 400; }
+/* The search field is the largest control on the page: it is the fastest way in. A magnifier
+   marks it as search, and the key hint on the right says how to run the query. */
+.search-box { position: relative; }
 .search-input {
-  width: 100%; min-height: 3.25rem; padding: 0 var(--space-4); font: inherit; font-size: var(--text-md);
-  color: var(--color-ink); background: var(--color-surface); border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius); appearance: none;
+  width: 100%; min-height: 3.5rem; padding: 0 14rem 0 3rem; font: inherit; font-size: var(--text-md);
+  color: var(--color-ink); border: 1px solid var(--color-line-strong); border-radius: var(--radius); appearance: none;
+  background: var(--color-surface) no-repeat 1rem center / 1.15rem url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6470' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.6-3.6'/%3E%3C/svg%3E");
   transition: border-color var(--duration-fast) ease-out;
 }
 .search-input::placeholder { color: var(--color-ink-3); opacity: 1; }
 .search-input:hover { border-color: var(--color-ink-3); }
 .search-input:focus-visible { outline-offset: 0; border-color: var(--color-accent); }
-.search-input:disabled { background: var(--color-sunken); color: var(--color-ink-3); cursor: not-allowed; }
-.search-input::-webkit-search-cancel-button { cursor: pointer; }
+.search-input:disabled { background-color: var(--color-sunken); color: var(--color-ink-3); cursor: not-allowed; }
+/* The browser's own clear mark is replaced by a button in .search-tools, which can be spaced. */
+.search-input::-webkit-search-cancel-button { display: none; }
+.search-tools {
+  position: absolute; right: var(--space-3); top: 0; bottom: 0; display: flex; align-items: center; gap: var(--space-4);
+  opacity: 0; visibility: hidden; transition: opacity var(--duration-fast) ease-out;
+}
+/* The tools appear once there is something to clear or run, so the empty field stays clean. */
+.search-box:has(.search-input:not(:placeholder-shown)) .search-tools { opacity: 1; visibility: visible; }
+.search-clear {
+  display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; padding: 0 0 2px;
+  font: inherit; font-size: 1.4rem; line-height: 1; color: var(--color-ink-3); background: transparent;
+  border: 0; border-radius: 50%; cursor: pointer;
+  transition: background-color var(--duration-fast) ease-out, color var(--duration-fast) ease-out;
+}
+.search-clear:hover { background: var(--color-sunken); color: var(--color-ink); }
+.search-key {
+  padding-left: var(--space-4); border-left: 1px solid var(--color-line);
+  color: var(--color-ink-3); font-size: var(--text-xs); line-height: 2rem; white-space: nowrap; pointer-events: none;
+}
+.search-key kbd {
+  display: inline-block; padding: 1px 6px; font: inherit; line-height: 1.4; font-weight: 600; color: var(--color-ink-2);
+  background: var(--color-sunken); border: 1px solid var(--color-line-strong); border-bottom-width: 2px; border-radius: 5px;
+}
 .examples { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); color: var(--color-ink-3); font-size: var(--text-sm); }
 .example {
   min-height: 2rem; padding: 0 var(--space-3); font: inherit; font-size: var(--text-sm); color: var(--color-accent-strong);
@@ -156,7 +187,9 @@ main { display: block; }
   color: var(--color-ink-3); font-size: var(--text-sm);
 }
 .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--color-line); }
-.fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4) var(--space-5); }
+/* As many columns as fit while every control keeps at least 16.5rem, the width at which the
+   longest option still reads comfortably: three on a desktop, two on a tablet, one on a phone. */
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(16.5rem, 100%), 1fr)); gap: var(--space-4) var(--space-5); align-items: start; }
 
 /* The action bar closes the panel: a sunken strip with the one primary action first. When the
    filters differ from the report on screen (callbacks set .is-stale on the button) the strip
@@ -199,47 +232,91 @@ main { display: block; }
 .stale-hint { flex: 1 1 16rem; color: var(--color-caution-ink); font-size: var(--text-sm); font-weight: 600; }
 .stale-hint:not(:empty) { animation: arrive var(--duration-base) var(--ease-out); }
 
-/* dcc.Dropdown (react-select), restyled with the tokens */
+/* dcc.Dropdown (react-select), restyled with the tokens. One height for every part: the control,
+   and the value inside it are sized from --control-h, so text sits
+   on the same line whether a filter is empty, holds one value or holds several. */
+.dropdown { --control-h: 3rem; font-size: var(--text-base); }
 .dropdown .Select-control {
-  min-height: 2.75rem; border: 1px solid var(--color-line-strong); border-radius: var(--radius);
+  display: flex; align-items: center; min-height: var(--control-h); height: auto;
+  border: 1px solid var(--color-line-strong); border-radius: var(--radius);
   background: var(--color-surface); box-shadow: none; cursor: pointer;
-  transition: border-color var(--duration-fast) ease-out;
+  transition: border-color var(--duration-fast) ease-out, background-color var(--duration-fast) ease-out;
 }
 .dropdown .Select-control:hover { border-color: var(--color-ink-3); box-shadow: none; }
 .dropdown.is-focused > .Select-control, .dropdown.is-open > .Select-control {
   border-color: var(--color-accent); outline: 3px solid var(--color-accent); outline-offset: 1px; box-shadow: none;
 }
-.dropdown .Select-placeholder, .dropdown.Select--single > .Select-control .Select-value {
-  line-height: 2.65rem; padding-left: var(--space-3); color: var(--color-ink-3);
+/* A filter that is narrowing the report looks different from one left on its default. */
+.dropdown.Select--multi.has-value > .Select-control { background: var(--color-accent-soft); border-color: var(--color-accent); }
+.dropdown .Select-multi-value-wrapper {
+  flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  min-height: calc(var(--control-h) - 2px); padding: 5px 0 5px var(--space-3);
 }
+.dropdown .Select-placeholder, .dropdown.Select--single > .Select-control .Select-value {
+  display: flex; align-items: center; top: 0; bottom: 0; height: auto; line-height: 1.3;
+  padding-left: var(--space-3); padding-right: 3rem; color: var(--color-ink-3);
+}
+/* A long value takes a second line instead of being cut off; two lines fit inside the control. */
+.dropdown.Select--single > .Select-control .Select-value { white-space: normal; line-height: 1.2; }
 .dropdown.Select--single > .Select-control .Select-value .Select-value-label,
-.dropdown.has-value.Select--single > .Select-control .Select-value .Select-value-label { color: var(--color-ink); }
-.dropdown .Select-input { height: 2.65rem; padding-left: var(--space-3); }
+.dropdown.has-value.Select--single > .Select-control .Select-value .Select-value-label {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  color: var(--color-ink); white-space: normal;
+}
+.dropdown .Select-input { height: auto; padding: 0; margin: 0; }
 .dropdown .Select-input:focus { outline: none; }     /* the control draws the ring */
-.dropdown .Select-input > input { padding: 0; line-height: 2.65rem; color: var(--color-ink); }
-.dropdown .Select-arrow { border-top-color: var(--color-ink-3); }
-.dropdown.is-open .Select-arrow { border-bottom-color: var(--color-ink-3); }
-.dropdown .Select-clear-zone { color: var(--color-ink-3); }
-.dropdown .Select-clear-zone:hover { color: var(--color-ink); }
+.dropdown .Select-input > input { padding: 0; line-height: 1.6; color: var(--color-ink); font: inherit; }
+/* The arrow and the clear button are full-height targets, not the small glyphs react-select draws. */
+.dropdown .Select-arrow-zone, .dropdown .Select-clear-zone {
+  flex: none; display: flex; align-items: center; justify-content: center; align-self: stretch;
+  width: 2.5rem; padding: 0; color: var(--color-ink-3);
+}
+.dropdown .Select-clear-zone { width: 2rem; border-radius: calc(var(--radius) - 2px); }
+.dropdown .Select-clear-zone:hover { color: var(--color-ink); background: var(--color-sunken); }
+.dropdown .Select-clear { font-size: 1.35rem; line-height: 1; }
+.dropdown .Select-arrow, .dropdown.is-open .Select-arrow {
+  position: static; width: 0.55rem; height: 0.55rem; border: solid var(--color-ink-2); border-width: 0 2px 2px 0;
+  transform: translateY(-25%) rotate(45deg); transition: transform var(--duration-fast) var(--ease-out);
+}
+.dropdown.is-open .Select-arrow { border-color: var(--color-accent-strong); transform: translateY(15%) rotate(-135deg); }
 .dropdown .Select-menu-outer {
-  margin-top: 4px; border: 1px solid var(--color-line-strong); border-radius: var(--radius); overflow: hidden;
-  background: var(--color-surface); box-shadow: var(--shadow); z-index: 25;
+  margin-top: 6px; border: 1px solid var(--color-line-strong); border-radius: var(--radius); overflow: hidden;
+  background: var(--color-surface); box-shadow: var(--shadow-raised); z-index: 30;
   animation: arrive var(--duration-fast) var(--ease-out);
 }
 .dropdown.is-disabled > .Select-control { background: var(--color-sunken); cursor: not-allowed; }
+/* Menu rows. The row height comes from the component (OPTION_HEIGHT_PX in layout.py places each
+   row), so no height is set here: a CSS height that disagreed would make rows overlap. Rows are
+   separated by a hairline drawn inside the row, which costs no height. */
+.dropdown .Select-menu { padding: 0; }
 .dropdown .Select-option, .dropdown .VirtualizedSelectOption {
-  display: flex; align-items: center; min-height: 2.5rem; padding: 0 var(--space-3);
-  background: var(--color-surface); color: var(--color-ink); font-size: var(--text-sm);
+  display: flex; align-items: center; box-sizing: border-box; padding: 0 var(--space-4);
+  background: var(--color-surface); color: var(--color-ink); font-size: 0.9375rem; line-height: 1.25; cursor: pointer;
+  white-space: normal; overflow: hidden;      /* a long option wraps to a second line; two lines fit the row */
+  box-shadow: inset 0 -1px 0 var(--color-line);
 }
-.dropdown .Select-option.is-focused, .dropdown .VirtualizedSelectFocusedOption { background: var(--color-accent-soft); }
+.dropdown .Select-option.is-focused, .dropdown .VirtualizedSelectFocusedOption {
+  background: var(--color-accent-soft);
+  box-shadow: inset 3px 0 0 var(--color-accent), inset 0 -1px 0 var(--color-line);
+}
 .dropdown .Select-option.is-selected, .dropdown .VirtualizedSelectSelectedOption { font-weight: 650; color: var(--color-accent-strong); }
-.dropdown.Select--multi .Select-value {
-  margin: 5px 0 0 5px; border: 1px solid transparent; border-radius: calc(var(--radius) - 2px);
-  background: var(--color-accent-soft); color: var(--color-accent-strong); font-size: var(--text-sm); line-height: 1.6;
+.dropdown .Select-option.is-selected::after, .dropdown .VirtualizedSelectSelectedOption::after {
+  content: ""; margin-left: auto; width: 0.4rem; height: 0.75rem; flex: none;
+  border: solid var(--color-accent-strong); border-width: 0 2px 2px 0; transform: translateY(-15%) rotate(45deg);
 }
-.dropdown.Select--multi .Select-value-icon { border-right-color: transparent; padding: 1px 6px 2px; }
+/* A chosen value: the label first, then a remove button big enough to hit. */
+.dropdown.Select--multi .Select-value {
+  display: inline-flex; flex-direction: row-reverse; align-items: stretch; margin: 0; max-width: 100%;
+  border: 1px solid var(--color-accent); border-radius: 999px; overflow: hidden;
+  background: var(--color-surface); color: var(--color-accent-strong); font-size: var(--text-sm); line-height: 1.5;
+}
+.dropdown.Select--multi .Select-value-label { padding: 3px 4px 3px 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dropdown.Select--multi .Select-value-icon {
+  display: flex; align-items: center; justify-content: center; min-width: 1.75rem; padding: 0 6px 1px;
+  border: 0; font-size: 1.1rem; line-height: 1; color: var(--color-accent-strong); cursor: pointer;
+}
 .dropdown.Select--multi .Select-value-icon:hover { background: var(--color-accent); color: var(--color-on-accent); }
-.dropdown .Select-noresults { color: var(--color-ink-3); }
+.dropdown .Select-noresults { padding: var(--space-3) var(--space-4); color: var(--color-ink-3); font-size: var(--text-sm); }
 
 /* ---------- report ---------- */
 .report { position: relative; margin-top: var(--space-7); }
@@ -423,7 +500,6 @@ details[open] > .table-wrap { animation: arrive var(--duration-base) var(--ease-
   .answer-figure { font-size: var(--text-3xl); }
   .tile-value { font-size: var(--text-xl); }
   .finding h3 { font-size: var(--text-md); }
-  .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
   .controls { padding: var(--space-4) var(--space-4) 0; }
   .actions { margin-inline: calc(-1 * var(--space-4)); padding: var(--space-4); }
   .card { padding: var(--space-4) var(--space-3); }
@@ -437,7 +513,6 @@ details[open] > .table-wrap { animation: arrive var(--duration-base) var(--ease-
 }
 @media (max-width: 480px) {
   :root { --masthead-height: 5.75rem; }
-  .fields { grid-template-columns: minmax(0, 1fr); }
   .tiles { grid-template-columns: minmax(0, 1fr); }
   .tile, .tile:nth-child(odd) { padding: var(--space-3) 0; border-left: 0; }
   .tile + .tile { border-top: 1px solid var(--color-line); }
@@ -455,8 +530,12 @@ details[open] > .table-wrap { animation: arrive var(--duration-base) var(--ease-
 @media (pointer: coarse) {
   .graph:not(.graph-map) .modebar-container { display: none; }
   .example { min-height: 2.75rem; padding: 0 var(--space-4); }
-  .dropdown.Select--multi .Select-value-icon { padding: 5px 10px 6px; }
-  .dropdown.Select--multi .Select-value-label { padding: 5px 8px 6px; }
+  .dropdown { --control-h: 3.25rem; }
+  .dropdown .Select-option, .dropdown .VirtualizedSelectOption { font-size: var(--text-base); line-height: 1.2; }
+  .dropdown.Select--multi .Select-value-icon { min-width: 2.5rem; }
+  .dropdown.Select--multi .Select-value-label { padding: 7px 4px 7px 14px; }
+  .search-key { display: none; }
+  .search-input { padding-right: 3.5rem; }
 }
 /* Reduced motion: no movement and no fades. The states themselves stay (the progress line shows
    at full width, the report dims, the button says "Generating…", the action bar changes tone). */

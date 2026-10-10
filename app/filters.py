@@ -41,7 +41,7 @@ DEFAULT_HARM = "injury"
 # Where the crash happened relative to the housing sites (the spatial join of the two datasets).
 SCOPE = {
     "city": "Anywhere in the city",
-    "near": "Within 250 m of housing (nearest site matches the housing filters)",
+    "near": "Within 250 m of a housing site",
 }
 DEFAULT_SCOPE = "city"
 BUFFER_M = 250
