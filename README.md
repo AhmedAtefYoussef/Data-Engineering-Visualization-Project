@@ -125,7 +125,7 @@ Email ICS503Data@gmail.com by 9 November 2026 with:
 
 ## Team contributions
 
-Five members, two research questions each. The full split of cleaning, integration, website and documentation work is in `docs/CONTRIBUTIONS.md` and in Section 14 of the notebook. `docs/ANSWERS.md` answers each member's two research questions in plain words, with how the answer was measured and what it means for the city.
+Five members, two research questions each. The full split of cleaning, integration, website and documentation work is in `docs/CONTRIBUTIONS.md` and in Section 13 of the notebook. `docs/ANSWERS.md` answers each member's two research questions in plain words, with how the answer was measured and what it means for the city.
 
 | Member | Name | Student ID | Research questions |
 |---|---|---|---|

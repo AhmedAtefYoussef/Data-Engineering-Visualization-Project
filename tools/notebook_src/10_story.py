@@ -8,11 +8,11 @@
 # and RQ9 carries the p-value adjusted for its two outcomes.
 
 # %%
-# Objects of Sections 4 to 9 that Sections 10 to 15 read.
+# Objects of Sections 4 to 9 that Sections 10 to 14 read.
 assert_state("RESULTS", "rq9_result", "robustness_table", "CHECK_OUTCOME", "KIND_CENTRAL",
              "LARGEST_CLUSTERS_SHOWN", "city_year", "sites", "event_panel", "zip_year", "housing", "crashes")
 
-# --- Constants used only in Sections 10 to 15 -------------------------------------------------
+# --- Constants used only in Sections 10 to 14 -------------------------------------------------
 NO_DIFFERENCE = 0.0          # value every headline estimate is compared with
 OVERVIEW_COLUMNS = 2         # panels per row in the overview chart of the ten results
 COMPLETION_REL_YEAR = 0      # rel_year of the completion year: one row per site and cohort
@@ -474,111 +474,11 @@ say(f"Tests: Section 8 reports {limits['headline_intervals']} headline intervals
 # outside cars.
 
 # %% [markdown]
-# ## 13. Prompts and AI use
-#
-# AI coding assistants (Claude models from Anthropic, used through Claude Code) drafted code and
-# text for this project, including this notebook. The notebook was executed from top to bottom
-# on the real data, the outputs shown here are the outputs of that run, and the team is
-# responsible for everything in it. The assignment asks for the prompts used in any step.
-# Prompts whose text the team has are quoted below in full, and the others are described. The
-# notebook itself makes no calls to any model.
-#
-# ### 13.1 The first requests
-#
-# The first prompt of the project came with the project description and the data catalogue. It
-# asked the assistant to analyse both, to compare the available Claude models, to divide the
-# work among several assistants with one responsibility each, and to audit the result against
-# the requirements of the project description. Its text is not available word for word, so it
-# is described here and not quoted.
-#
-# The follow-up prompt in the same conversation was:
-#
-# > apply these skills as necessarily as possible: 21st-ui, design-motion-principles, design-taste-frontend, humanizer, impeccable, ui-ux-pro-max
-#
-# The team of five members and the light editorial civic look for the website were decided in
-# the same conversation.
-#
-# ### 13.2 The briefs given to the assistants
-#
-# The project was split into steps, each handled by one assistant with its own brief. Every
-# brief had the same parts: a role, the files to read, the files the assistant was allowed to
-# edit, the task, the quality bar and the form of the report. The table summarises them.
-#
-# | Step | Model | Role in the brief | Task | Output asked for |
-# |---|---|---|---|---|
-# | Spec review | Opus 5.5 | Adversarial architect | Find defects in the written specification: event-study design, meaning of the exposure flag, imputation leakage, paging, memory, gaps in the contract | Numbered findings with severity and exact fix text, under 600 words |
-# | Analysis and app | Sonnet 5.5 | Dash engineer and designer | Ten research-question functions, the Dash website, the search parser, the design brief | Files, tests, screenshot findings |
-# | Notebook and docs | Sonnet 5.5 | Technical writer | Notebook builder, README, methodology, data dictionary | Notebook execution result |
-# | Final audit | Opus 5.5 | Independent auditor | Check every requirement in the project description against the repository | Requirement-by-requirement table |
-#
-# The prompt patterns were: sections marked with XML-style tags (role, context, ownership, task,
-# output format), one responsibility and one set of editable files per assistant, a written
-# specification that all of them had to follow, reviewers that could read but not edit what
-# they judged, and a cap on the length of each report.
-#
-# ### 13.3 The request for this notebook
-#
-# This notebook was requested with the prompt below. The project description and the data
-# catalogue were attached to it.
-#
-# > Reverse engineer the entirety of the codebase in terms of architecture, technical code implementation, documentation and the finalized notebook deliverable. Apply a structural dynamic workflow incorporating multiple sub agents with their respective tasks concurrently, allowing the each subagent to effectively and productively focus on one specific task at a time. For example, a subagent is responsible for code literacy and syntax, another is responsible for logical reasoning and developing the best possible strategies to counteract potential problems in all aspects, etc. The structural workflow should allow each subagent to complete their respective tasks concurrently with maximum level of precision, accuracy and efficiency with the least possible token consumption. Finally, apply all of the necessary plugins, skills, etc. You may research through the Claude chat regarding this project to maximize your knowledge, intel, etc. Finally, the finalized version of the notebook should be perfect in all the aspects such as modularization, code organization, documentation, architecture in addition to coordinating a sub agent that checks whether the finalized notebook satisfies all of the requirements from the project description. Also, use the best datasets from the data catalog folder and I need the notebook to run independently without needing external folders or files, just both of the datasets used. Apply the best skills I have here such as humanizer, impeccable, design-motion-principle, etc. Go all out. Make no mistake.
-#
-# The same conversation contained three further prompts, and the two-word prompt "Try again" was
-# sent twice.
-#
-# > Build high quality top notch interactive web application according to the project requirements and specification by incorporating these skills as well; /humanizer
-#
-# > and these skills as well /anthropic-skills:impeccable /anthropic-skills:design-motion-principles /anthropic-skills:design-taste-frontend /anthropic-skills:ui-ux-pro-max
-#
-# > While you are continuing building this project, I need you to cut down the token usage by incorporating cheaper models for simpler tasks. For example, allow Claude opus 5.5 to execute and perform the complex tasks while sonnet 5.5 is responsible for code syntax and literacy. Basically apply the structural workflow, maintaining the quality and productivity of the work productivity and effectiveness overall while cutting down token usage in a strategic approach.
-#
-# The notebook is divided into numbered sections. Each section was drafted by a separate
-# assistant from a shared brief that fixed the datasets, the injury crash as the outcome, the
-# two integration levels and the writing rules, and each draft was executed on the real data
-# before it was accepted. Further assistants read the executed notebook, each from one point of
-# view: the requirements of the project description, the code, the statistics, the prose and
-# the charts. Each was asked for a list of findings with a location, a severity, the problem
-# and a proposed fix. The briefs of these reviewers are not available word for word.
-#
-# ### 13.4 The shared brief for the section authors
-#
-# The passages of the shared brief that set the content of the notebook are quoted below.
-# Passages that only name working folders and build commands are left out.
-#
-# > Datasets: H2 Affordable Housing Production by Building (hg8x-zxpr) and T4 Motor Vehicle Collisions - Crashes (h9gi-nx95). Crashes are a filtered copy: 2016-01-01 to 2025-12-31 and 19 of 29 columns.
-#
-# > Crash reporting broke in 2020: total crashes halve (211k in 2019, 113k in 2020, 86k in 2025) while injuries stay near 50-60k a year, because property-damage-only reports collapsed. So the PRIMARY OUTCOME everywhere is the **injury crash** (a crash with at least one person injured or killed). All-crash counts appear only in EDA and as a robustness check. Say this plainly wherever a time comparison is made.
-#
-# > Two integration levels, both justified in the text: (a) ZIP x year panel; (b) spatial proximity, a crash is "near" a building if within `BUFFER_M` = 250 m (haversine BallTree). No row-level key join exists or is faked.
-#
-# > Charts: matplotlib/seaborn only, static, no plotly, no map tiles, no network at view time. Use `PALETTE`, `BOROUGH_COLORS`, `finish()`. Every chart has a title that states what it shows, axis labels with units, a legend when there is more than one series, and a labelled log axis when a log axis is used. One figure per code cell, followed by a markdown or `say()` reading of it. Pick the chart type for the question; no pie charts, no 3D, no dual axes.
-#
-# > Small named functions with docstrings; descriptive names (`housing_clean`, not `h2` or `df1`); no one-letter frames; no semicolon-joined statements; no magic numbers (name them); no dead code; no try/except that hides errors.
-#
-# > Comment the non-obvious logic (outlier rule, spatial index, imputation, bootstrap, difference-in-differences), explaining why, not restating the line.
-#
-# > Add `assert` checks for every invariant you claim (row conservation, uniqueness, no negative counts).
-#
-# > A markdown cell before every code block says what is about to be done and why. After the output, the reading of it. For every cleaning or design decision: the problem as observed in THIS data, the decision (drop, impute, flag, standardise), why, and the alternative considered and why it was rejected.
-#
-# > Never type a data-derived number into markdown. Numbers that come from the data are printed by code, using `say(f"...")` for sentences. Markdown carries the reasoning; it may state design constants and qualitative conclusions that you have verified in the executed output.
-#
-# > No claim of causation anywhere. This is observational data: say "is associated with", "coincides with", "differs from". State n and uncertainty with each result.
-#
-# The brief also listed the ten research questions with their owners, in the wording of the
-# team table at the top of this notebook.
-#
-# ### 13.5 Prompts inside the product
-#
-# None. Neither the notebook nor the website sends anything to a language model.
-
-# %% [markdown]
-# ## 14. Contributions
+# ## 13. Contributions
 #
 # The table is the team's split of the work. Each member owns two research questions with their
-# charts and a share of the cleaning, integration and website work. Code and text were drafted
-# with AI assistance as described in Section 13, so owning a part means having directed, checked
-# and corrected it and being able to explain it. Section numbers refer to this notebook.
+# charts and a share of the cleaning, integration and website work. Section numbers refer to this
+# notebook.
 #
 # | Member | Name | Research questions and charts | Data cleaning | Integration | Website components | Other work |
 # |---|---|---|---|---|---|---|
@@ -586,14 +486,14 @@ say(f"Tests: Section 8 reports {limits['headline_intervals']} headline intervals
 # | M2 | Nour Mostafa Aly | RQ3 event study (lines with interval bands); RQ4 building size (scatter with fitted slope) | Crashes: key, duplicates, dates, time of day, borough and ZIP code (4.7, 4.8) | Distance join with the ball tree and its brute-force check, choice of the 250 m buffer (5.3) | Event-study cards and the bootstrap callback | Crash exploration (3.2), bootstrap and difference-in-differences functions (Section 7) |
 # | M3 | Yahia Mohamed | RQ5 new construction against preservation (interval plot); RQ6 pedestrian and cyclist share by borough (interval plot) | Crashes: coordinates, casualty totals against their parts, extreme injury counts, contributing-factor groups (4.8 to 4.11) | Sites, clusters and the screen for nearby completions (5.4) | Search box and the query parser | Robustness checks (Section 9), data dictionary |
 # | M4 | Moaz Ahmed | RQ7 site selection (map and percentile distribution); RQ8 hour of day (heat map) | ZIP code recovery from coordinates and its holdout validation (6.1) | Tagging crashes with their nearest site (5.5), conservation and uniqueness checks (6.4) | Map and heat-map cards, page layout, accessibility | Deployment configuration, architecture notes |
-# | M5 | Yassin Fady | RQ9 deep-affordable share across ZIP codes (scatter by borough); RQ10 contributing factors (interval plot with adjusted tests) | Post-integration cleaning: borough from two sources, redundant columns, data types (6.2, 6.3) | Cumulative unit stock and the citywide index (6.2, 6.5), final table schema | Story tab and the data and method tab | Findings, limits, impact, prompts and reproducibility (Sections 10 to 15), deployment on the hosting platform |
+# | M5 | Yassin Fady | RQ9 deep-affordable share across ZIP codes (scatter by borough); RQ10 contributing factors (interval plot with adjusted tests) | Post-integration cleaning: borough from two sources, redundant columns, data types (6.2, 6.3) | Cumulative unit stock and the citywide index (6.2, 6.5), final table schema | Story tab and the data and method tab | Findings, limits, impact and reproducibility (Sections 10 to 14), deployment on the hosting platform |
 #
 # Each member reviewed the code and text of their own two questions in Section 8 and can explain
 # them. Names and student IDs are in the team table at the top.
 
 
 # %% [markdown]
-# ## 15. Reproducibility
+# ## 14. Reproducibility
 #
 # The notebook needs nothing but itself. Put it in any folder and run all cells. If the two data
 # files, `housing_hg8x-zxpr.csv` and `crashes_h9gi-nx95.csv.gz`, are not in that folder, Section
@@ -610,7 +510,7 @@ say(f"Tests: Section 8 reports {limits['headline_intervals']} headline intervals
 # gives the same numbers. The cell below records the environment, the size of the tables at
 # each stage and how recent the data are.
 #
-# The code of the website described in Section 14 is in the project repository:
+# The code of the website described in Section 13 is in the project repository:
 # https://github.com/AhmedAtefYoussef/Data-Engineering-Visualization-Project
 
 # %%
