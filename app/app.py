@@ -1,4 +1,4 @@
-"""Entry point. `app.app:server` for gunicorn, `python -m app.app` for local development.
+"""Entry point. `app.app:server` is the WSGI server Vercel runs; `python -m app.app` runs it locally.
 
 The process loads the exported tables once, builds the layout, registers the callbacks and
 computes the default report so the first visitor does not wait for the bootstraps. It reads

@@ -36,7 +36,7 @@ Each student should check their own row and record the result in their own words
 | M2 | Read the ball tree code and its brute-force check, and the RQ3 code in Section 8.3 with the difference-in-differences function in Section 7. Check the event-study card on the site against the notebook. |
 | M3 | Read the cluster and screen logic (5.4) and explain how the screen changes the sample. Try ten phrases in the search box and confirm that search only sets filters. Read Section 9. |
 | M4 | Read the ZIP recovery and its holdout validation (6.1), and the RQ7 code in Section 8.7 and why its benchmark is street points and not other housing. Check the map and heat map at phone width. Confirm `render.yaml` and `requirements.txt`. |
-| M5 | Run `python tools/build_app_data.py` and `python -m pytest -q tests`. Read the cleaning log and Sections 10 to 15 for numbers that do not match the executed outputs. Read `docs/AGENT_WORKFLOW.md` and `docs/PROMPTS.md` for accuracy. Deploy on Render and test the address. |
+| M5 | Run `python tools/build_app_data.py` and `python -m pytest -q tests`. Read the cleaning log and Sections 10 to 15 for numbers that do not match the executed outputs. Read `docs/AGENT_WORKFLOW.md` and `docs/PROMPTS.md` for accuracy. Deploy on Vercel and test the address. |
 
 ## How to record individual contributions
 

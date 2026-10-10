@@ -34,7 +34,9 @@ tests/
   test_site.py, conftest.py
 docs/                          architecture, methodology, data dictionary, contributions,
                                prompts, agent workflow
-requirements.txt, runtime.txt, Procfile, render.yaml
+requirements.txt                site dependencies (what Vercel installs)
+requirements-dev.txt            notebook, data build and tests
+pyproject.toml, .vercelignore   Vercel entry point and the folders left out of the deployment
 ```
 
 ## Setup
@@ -44,7 +46,7 @@ You need Python 3.12 or newer. The notebook stops at its first code cell on an o
 ```bash
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 ## Run the notebook
@@ -89,14 +91,6 @@ python -m app.app
 
 Open http://127.0.0.1:8050. Set the `PORT` environment variable to use another port. The site reads only `app/data/` and downloads nothing at start-up. The map's background tiles load from Carto in the visitor's browser, so the map needs an internet connection.
 
-To run it as Render will, on Linux or macOS:
-
-```bash
-gunicorn app.app:server --workers 1 --threads 4 --timeout 120 --preload
-```
-
-Gunicorn does not run on Windows, and it has not been tried here.
-
 ## Run the tests
 
 ```bash
@@ -105,18 +99,20 @@ python -m pytest -q tests
 
 The 79 tests cover the search parser, the filters, the pre-aggregated tables (totals must agree across all of them), the chart builders, the callbacks through Flask's test client, and agreement between the site's numbers and the notebook's. They passed in about 9 seconds on Python 3.14.3.
 
-## Deploy on Render
+## Deploy on Vercel
 
-The site has not been deployed yet. The deployment link below must be added once it exists.
+The site has not been deployed yet. Add the deployment link below once it exists.
 
-1. Push the repository to GitHub (the remote is already set to https://github.com/AhmedAtefYoussef/Data-Engineering-Visualization-Project, but nothing has been committed or pushed yet). Make sure `app/data/` is included, because the site reads nothing else.
-2. In the Render dashboard choose New > Blueprint.
-3. Connect your GitHub account and pick the repository. Render reads `render.yaml`, which defines one free web service named `nyc-housing-safety`: Python 3.12.8, build command `pip install -r requirements.txt`, and gunicorn with one worker and four threads as the start command. The service needs no environment variables and no disk.
-4. Apply the blueprint and wait for the build to finish and the health check on `/` to pass.
-5. Open the `onrender.com` address in a private window. Check that the page loads, that Generate report redraws every chart, that a search such as "Brooklyn 2022 new construction" fills the filters, and that the page works at phone width.
+Vercel runs the site as one Python function. `pyproject.toml` names the entry point (`app.app:server`, the Flask server that Dash creates), `requirements.txt` lists the five packages the site needs, and `.vercelignore` keeps the notebook, tools, tests and docs out of the deployment.
+
+1. Merge the pull request so that `main` holds the site and `app/data/`.
+2. In the Vercel dashboard choose Add New > Project and import the GitHub repository.
+3. Leave the framework preset and the build settings as Vercel detects them. The project needs no environment variables.
+4. Deploy and wait for the build to finish.
+5. Open the `vercel.app` address in a private window. Check that the page is styled, that Generate report redraws every chart, that a search such as "Brooklyn 2022 new construction" fills the filters, and that the page works at phone width.
 6. Write the address into the submission email and add it here: Deployment link: TO ADD after the first deploy.
 
-Free Render services sleep after a period without visitors, and the first request after sleep is slow. The free plan has 512 MB of memory. The site used about 280 MB when run locally, but its memory use on Render has not been measured.
+Three things to know. The configuration follows Vercel's documentation but has not been tried on Vercel, so the first build is the test. The function starts on demand, so the first visit after a quiet period waits a few seconds while the data loads (about 3 seconds locally). The installed packages take about 350 MB, under Vercel's 500 MB limit for Python functions; pyarrow is the largest part that could be dropped if that limit ever becomes a problem.
 
 ## Submission checklist
 
