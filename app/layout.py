@@ -123,7 +123,9 @@ def controls() -> html.Div:
         _field("Time of day", "f-hour", _dropdown("f-hour", _options(HOUR_BANDS, hour_labels), placeholder="Any time"),
                note=MULTI_NOTE),
         _field("Who was harmed", "f-harm", _dropdown("f-harm", _options(list(HARM), harm_labels), DEFAULT_HARM, multi=False)),
-        _field("Crash location", "f-scope", _dropdown("f-scope", _options(list(SCOPE), SCOPE), DEFAULT_SCOPE, multi=False)),
+        # The option labels are kept short enough to fit the control; the qualifier sits under it.
+        _field("Crash location", "f-scope", _dropdown("f-scope", _options(list(SCOPE), SCOPE), DEFAULT_SCOPE, multi=False),
+               help_text="Near housing: the housing filters apply to each crash's nearest site."),
     ])
     actions = html.Div(className="actions", children=[
         html.Button("Generate report", id="generate", n_clicks=0, className="button button-primary",

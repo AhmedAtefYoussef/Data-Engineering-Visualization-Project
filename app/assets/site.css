@@ -187,7 +187,9 @@ main { display: block; }
   color: var(--color-ink-3); font-size: var(--text-sm);
 }
 .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--color-line); }
-.fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4) var(--space-5); }
+/* As many columns as fit while every control keeps at least 16.5rem, the width at which the
+   longest option still reads comfortably: three on a desktop, two on a tablet, one on a phone. */
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(16.5rem, 100%), 1fr)); gap: var(--space-4) var(--space-5); align-items: start; }
 
 /* The action bar closes the panel: a sunken strip with the one primary action first. When the
    filters differ from the report on screen (callbacks set .is-stale on the button) the strip
@@ -254,9 +256,12 @@ main { display: block; }
   display: flex; align-items: center; top: 0; bottom: 0; height: auto; line-height: 1.3;
   padding-left: var(--space-3); padding-right: 3rem; color: var(--color-ink-3);
 }
+/* A long value takes a second line instead of being cut off; two lines fit inside the control. */
+.dropdown.Select--single > .Select-control .Select-value { white-space: normal; line-height: 1.2; }
 .dropdown.Select--single > .Select-control .Select-value .Select-value-label,
 .dropdown.has-value.Select--single > .Select-control .Select-value .Select-value-label {
-  color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  color: var(--color-ink); white-space: normal;
 }
 .dropdown .Select-input { height: auto; padding: 0; margin: 0; }
 .dropdown .Select-input:focus { outline: none; }     /* the control draws the ring */
@@ -286,8 +291,8 @@ main { display: block; }
 .dropdown .Select-menu { padding: 0; }
 .dropdown .Select-option, .dropdown .VirtualizedSelectOption {
   display: flex; align-items: center; box-sizing: border-box; padding: 0 var(--space-4);
-  background: var(--color-surface); color: var(--color-ink); font-size: 0.9375rem; line-height: 1.3; cursor: pointer;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: var(--color-surface); color: var(--color-ink); font-size: 0.9375rem; line-height: 1.25; cursor: pointer;
+  white-space: normal; overflow: hidden;      /* a long option wraps to a second line; two lines fit the row */
   box-shadow: inset 0 -1px 0 var(--color-line);
 }
 .dropdown .Select-option.is-focused, .dropdown .VirtualizedSelectFocusedOption {
@@ -495,7 +500,6 @@ details[open] > .table-wrap { animation: arrive var(--duration-base) var(--ease-
   .answer-figure { font-size: var(--text-3xl); }
   .tile-value { font-size: var(--text-xl); }
   .finding h3 { font-size: var(--text-md); }
-  .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
   .controls { padding: var(--space-4) var(--space-4) 0; }
   .actions { margin-inline: calc(-1 * var(--space-4)); padding: var(--space-4); }
   .card { padding: var(--space-4) var(--space-3); }
@@ -509,7 +513,6 @@ details[open] > .table-wrap { animation: arrive var(--duration-base) var(--ease-
 }
 @media (max-width: 480px) {
   :root { --masthead-height: 5.75rem; }
-  .fields { grid-template-columns: minmax(0, 1fr); }
   .tiles { grid-template-columns: minmax(0, 1fr); }
   .tile, .tile:nth-child(odd) { padding: var(--space-3) 0; border-left: 0; }
   .tile + .tile { border-top: 1px solid var(--color-line); }
@@ -528,7 +531,7 @@ details[open] > .table-wrap { animation: arrive var(--duration-base) var(--ease-
   .graph:not(.graph-map) .modebar-container { display: none; }
   .example { min-height: 2.75rem; padding: 0 var(--space-4); }
   .dropdown { --control-h: 3.25rem; }
-  .dropdown .Select-option, .dropdown .VirtualizedSelectOption { font-size: var(--text-base); }
+  .dropdown .Select-option, .dropdown .VirtualizedSelectOption { font-size: var(--text-base); line-height: 1.2; }
   .dropdown.Select--multi .Select-value-icon { min-width: 2.5rem; }
   .dropdown.Select--multi .Select-value-label { padding: 7px 4px 7px 14px; }
   .search-key { display: none; }

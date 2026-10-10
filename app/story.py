@@ -457,8 +457,6 @@ def footer(store: Store) -> html.Footer:
     as_of = meta["data_as_of"]
     saved = sorted(set(as_of["raw_files_saved"].values()))[-1]
     return html.Footer(className="footer", children=[
-        html.P("Data Engineering and Visualization, German International University, Winter 2026. "
-               "Milestone 1 project by a team of five."),
         html.P(f"Source data downloaded from NYC Open Data on {saved}. Latest crash {as_of['latest_crash']}, "
                f"latest housing completion {as_of['latest_housing_completion']}. Site data built "
                f"{meta['built_at']} from the project notebook."),
