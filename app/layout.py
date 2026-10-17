@@ -92,7 +92,7 @@ def controls() -> html.Div:
         html.Div(className="search-box", children=[
             dcc.Input(id="search", type="search", debounce=False, value="", className="search-input",
                       placeholder="Type a place, a period and what you want to see", autoComplete="off",
-                      spellCheck=False, n_submit=0),
+                      spellCheck=False, n_submit=0, maxLength=200),
             # The clear button and the key hint share one row on the right of the field, so the gap
             # between them is set in one place. assets/site.js empties the field when the button is pressed.
             html.Div(className="search-tools", children=[

@@ -182,16 +182,16 @@ def _take_years(text: str) -> tuple[tuple[int, int] | None, str | None, str, boo
     return None, None, text, False
 
 
+MAX_QUERY_CHARS = 200
+
+
 def _take_phrases(text: str, table: dict) -> tuple[list[tuple[str, object]], str]:
     """Every phrase of `table` found in `text` (longest first), and the text with them blanked out."""
     found = []
     for phrase in sorted(table, key=len, reverse=True):
         pattern = rf"(?<![\w+]){re.escape(phrase)}(?![\w+])"
-        match = re.search(pattern, text)
-        while match:
-            found.append((phrase, table[phrase]))
-            text = text[:match.start()] + " " + text[match.end():]
-            match = re.search(pattern, text)
+        text, count = re.subn(pattern, " ", text)   # one pass per phrase, not one search per match
+        found.extend([(phrase, table[phrase])] * count)
     return found, text
 
 
@@ -232,12 +232,12 @@ def _negated_terms(text: str) -> tuple[str, list[str]]:
     term = rf"(?:{_YEAR_TERM}|{'|'.join(re.escape(phrase) for phrase in phrases)}|[a-z0-9+]+)"
     pattern = re.compile(rf"{_NEGATION}({term}(?:\s+(?:or|and|nor)\s+{term})*)(?![\w+])")
     reported = []
-    while True:
-        match = pattern.search(text)
-        if not match:
-            return text, reported
+
+    def blank(match):
         reported.append(f"negation is not supported: {match.group(1)}")
-        text = text[:match.start()] + " " + text[match.end():]
+        return " "
+
+    return pattern.sub(blank, text), reported
 
 
 SPECIFIC_HARM = ("ped", "cyc", "mot")      # road users; these win over the generic injury, fatal and all words
@@ -322,7 +322,8 @@ def _link_housing_to_location(parsed: ParsedQuery) -> None:
 
 def parse_query(text: str | None) -> ParsedQuery:
     """Parse a free-text query into control values, the pieces understood and the words left over."""
-    parsed = ParsedQuery(text=text or "")
+    text = (text or "")[:MAX_QUERY_CHARS]   # a search is a few words; a long paste is cut, not parsed
+    parsed = ParsedQuery(text=text)
     remaining = " " + re.sub(r"[,;:!?()\"']", " ", (text or "").lower()) + " "
     remaining, notes = _negated_terms(remaining)
     remaining = _read_years(parsed, remaining, notes)
