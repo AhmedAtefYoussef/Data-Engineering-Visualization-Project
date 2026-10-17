@@ -1,6 +1,6 @@
 {
- "built_at": "2026-10-10 15:30 UTC",
- "build_seconds": 71,
+ "built_at": "2026-10-16 23:59 UTC",
+ "build_seconds": 57,
  "datasets": {
   "housing": {
    "id": "hg8x-zxpr",
@@ -28,11 +28,12 @@
   "housing_confidential": 1949,
   "crashes": 1504722,
   "injury_crashes": 409967,
+  "crashes_time_unknown": 23717,
   "crashes_located": 1372222,
   "crashes_near_a_site": 782969,
   "sites": 7593,
-  "zip_year": 1710,
-  "panel_zips": 171,
+  "zip_year": 1720,
+  "panel_zips": 172,
   "event_site_cohorts": 2175
  },
  "constants": {
@@ -136,16 +137,16 @@
  },
  "files": {
   "city_year.parquet": 7267,
-  "cleaning_log.parquet": 8940,
-  "crash_cube.parquet": 438147,
+  "cleaning_log.parquet": 8546,
+  "crash_cube.parquet": 437308,
   "event_sites.parquet": 65191,
-  "hour_cube.parquet": 739333,
-  "housing_cube.parquet": 18175,
-  "map_grid.parquet": 1233255,
-  "results.json": 16367,
-  "robustness.parquet": 14744,
-  "sites.parquet": 193295,
-  "zip_cube.parquet": 529787,
-  "zip_year.parquet": 54241
+  "hour_cube.parquet": 733009,
+  "housing_cube.parquet": 18158,
+  "map_grid.parquet": 1233457,
+  "results.json": 14708,
+  "robustness.parquet": 13807,
+  "sites.parquet": 190971,
+  "zip_cube.parquet": 528451,
+  "zip_year.parquet": 44437
  }
 }

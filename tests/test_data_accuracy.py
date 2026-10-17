@@ -96,9 +96,15 @@ def _raw_housing() -> pd.DataFrame:
                           & _in_city_box(housing["latitude"], housing["longitude"]))
     completed = housing["building_completion_date"].fillna(housing["project_completion_date"])
     housing["cyear"] = pd.to_numeric(completed.str[:4])
+    # A building completed again under a later project adds no units (the notebook's Section 5 rule).
+    done = housing.assign(cdate=pd.to_datetime(completed))
+    done = done[done["cdate"].notna() & done["building_id"].notna()].sort_values(["cdate", "project_id"])
+    repeat = done.index[done["building_id"].duplicated()]
     units = housing["total_units"]
     housing["band"] = np.select([units <= 4, units <= 19, units <= 49, units <= 149],
                                 ["1-4", "5-19", "20-49", "50-149"], "150+")
+    for column in ["total_units", "all_counted_units"]:            # units as the aggregates count them
+        housing[f"{column}_counted"] = housing[column].where(~housing.index.isin(repeat), 0)
     housing["ctype"] = housing["reporting_construction_type"]
     housing["kind"] = housing["ctype"] + " | " + housing["band"]
     return housing
@@ -291,15 +297,15 @@ def test_housing_cube(raw, tables, store):
     done = raw["housing"][raw["housing"]["cyear"].between(constants["year_start"], constants["year_end"])]
     done = done.assign(n=1, cyear=done["cyear"].astype(int))
     cube = tables["housing_cube"]
-    assert (len(done), int(done["total_units"].sum()), int(done["all_counted_units"].sum())) == (
+    assert (len(done), int(done["total_units_counted"].sum()), int(done["all_counted_units_counted"].sum())) == (
         int(cube["buildings"].sum()), int(cube["total_units"].sum()), int(cube["affordable_units"].sum()))
     raw_dims = ["borough", "cyear", "ctype", "band", "located"]
     site_dims = ["borough", "year", "construction_type", "size_band", "is_located"]
-    for raw_column, site_column in [("n", "buildings"), ("all_counted_units", "affordable_units"),
-                                    ("total_units", "total_units")]:
+    for raw_column, site_column in [("n", "buildings"), ("all_counted_units_counted", "affordable_units"),
+                                    ("total_units_counted", "total_units")]:
         assert_same_counts(done.groupby(raw_dims)[raw_column].sum(),
                            cube.groupby(site_dims, observed=True)[site_column].sum())
-    assert_same_counts(done.assign(z=done["postcode"].fillna("")).groupby("z")["all_counted_units"].sum(),
+    assert_same_counts(done.assign(z=done["postcode"].fillna("")).groupby("z")["all_counted_units_counted"].sum(),
                        cube.groupby(cube["zip"].astype(str))["affordable_units"].sum())
 
 
@@ -375,11 +381,11 @@ def test_headline_numbers_through_site_filters(raw, store, name):
     homes = housing[keep]
     assert numbers["buildings"] == len(homes)
     assert numbers["buildings_unlocated"] == int((~homes["located"]).sum())
-    assert numbers["affordable_units"] == int(homes["all_counted_units"].sum())
-    assert numbers["total_units"] == int(homes["total_units"].sum())
+    assert numbers["affordable_units"] == int(homes["all_counted_units_counted"].sum())
+    assert numbers["total_units"] == int(homes["total_units_counted"].sum())
     assert len(data.map_sites(store, filters)) == int(homes["located"].sum())
     by_year = data.completions_by_year(store, filters)
-    assert_same_counts(homes.groupby([homes["cyear"].astype(int), "ctype"])["all_counted_units"].sum(),
+    assert_same_counts(homes.groupby([homes["cyear"].astype(int), "ctype"])["all_counted_units_counted"].sum(),
                        by_year["affordable_units"].stack())
 
 
@@ -707,14 +713,14 @@ def test_story_charts(store):
 # ---------------------------------------------------------------------------------------------
 SEARCH_CASES = [
     ("Brooklyn 2022 new buildings", dict(boroughs=["Brooklyn"], year_from=2022, year_to=2022,
-                                         construction=["New Construction"]), []),
+                                         construction=["New Construction"], scope="near"), []),
     ("bronx pedestrians night 2019-2021", dict(boroughs=["Bronx"], year_from=2019, year_to=2021, hours=["Night"],
                                                harm="ped"), []),
     ("queens cyclists speeding since 2021", dict(boroughs=["Queens"], year_from=2021,
                                                  factors=["Speed or aggressive driving"], harm="cyc"), []),
     ("manhattan large buildings near housing", dict(boroughs=["Manhattan"], sizes=["50-149", "150+"], scope="near"), []),
     ("brooklin 2020", dict(boroughs=["Brooklyn"], year_from=2020, year_to=2020), []),
-    ("manhatan preservation", dict(boroughs=["Manhattan"], construction=["Preservation"]), []),
+    ("manhatan preservation", dict(boroughs=["Manhattan"], construction=["Preservation"], scope="near"), []),
     ("staten island fatal 2018 to 2020", dict(boroughs=["Staten Island"], year_from=2018, year_to=2020, harm="fatal"), []),
     ("si deaths", dict(boroughs=["Staten Island"], harm="fatal"), []),
     ("bx and bk 2017", dict(boroughs=["Bronx", "Brooklyn"], year_from=2017, year_to=2017), []),
@@ -729,8 +735,8 @@ SEARCH_CASES = [
     ("drunk driving", dict(factors=["Impairment or medical"]), []),
     ("speeding morning", dict(factors=["Speed or aggressive driving"], hours=["Morning"]), []),
     ("failure to yield afternoon", dict(factors=["Failure to yield or obey"], hours=["Afternoon"]), []),
-    ("preservation small buildings", dict(construction=["Preservation"], sizes=["1-4", "5-19"]), []),
-    ("towers", dict(sizes=["150+"]), []),
+    ("preservation small buildings", dict(construction=["Preservation"], sizes=["1-4", "5-19"], scope="near"), []),
+    ("towers", dict(sizes=["150+"], scope="near"), []),
     ("within 250m new construction 50-149 units", dict(construction=["New Construction"], sizes=["50-149"],
                                                        scope="near"), []),
     ("pedestrians and cyclists", dict(harm="pedcyc"), []),
@@ -770,7 +776,7 @@ def test_search_query(query, expected, unmatched):
 
 @pytest.mark.parametrize("query, by_hand", [
     ("Brooklyn 2022 new construction", dict(boroughs=["Brooklyn"], year_from=2022, year_to=2022,
-                                            construction=["New Construction"])),
+                                            construction=["New Construction"], scope="near")),
     ("bronx pedestrians night 2019-2021", dict(boroughs=["Bronx"], year_from=2019, year_to=2021, hours=["Night"],
                                                harm="ped")),
     ("si deaths", dict(boroughs=["Staten Island"], harm="fatal")),

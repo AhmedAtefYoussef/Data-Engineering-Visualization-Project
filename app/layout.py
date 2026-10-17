@@ -14,6 +14,7 @@ from app.data import Store
 from app.filters import (BOROUGHS, CONSTRUCTION_TYPES, DEFAULT_HARM, DEFAULT_SCOPE, FACTOR_GROUPS, HARM,
                          HOUR_BAND_RANGES, HOUR_BANDS, SCOPE, SIZE_BANDS, YEAR_END, YEAR_START, YEARS)
 from app.report import CHART_KEYS
+from app.theme import GRAPH_CONFIG
 
 log = logging.getLogger(__name__)
 
@@ -32,8 +33,6 @@ CHART_CARDS = {
     "scatter": ("Housing against crashes, one dot per ZIP code", "Scatter plot", "", "Both datasets"),
     "event": ("Before and after completion", "Line chart with intervals", "card-wide", "Both datasets"),
 }
-GRAPH_CONFIG = {"displaylogo": False, "responsive": True,
-                "modeBarButtonsToRemove": ["lasso2d", "select2d", "autoScale2d"]}
 # Wheel zoom stays off on the map so that scrolling the page never gets trapped inside it;
 # the map zooms with its buttons, a double click or a pinch.
 MAP_CONFIG = {**GRAPH_CONFIG, "scrollZoom": False}

@@ -16,7 +16,7 @@ import difflib
 import re
 from dataclasses import dataclass, field
 
-from app.filters import (BOROUGHS, CONSTRUCTION_TYPES, FACTOR_GROUPS, HARM, HOUR_BANDS, SCOPE,
+from app.filters import (HARM_SHORT, BOROUGHS, CONSTRUCTION_TYPES, FACTOR_GROUPS, HARM, HOUR_BANDS, SCOPE,
                          SIZE_BANDS, YEAR_END, YEAR_START, make_filters, Filters)
 
 # phrase -> canonical value, one table per control -------------------------------------------------
@@ -85,7 +85,7 @@ HOUR_WORDS = {
     "evening": "Evening", "evenings": "Evening",
 }
 HARM_WORDS = {
-    "pedestrians": "ped", "pedestrian": "ped", "walking": "ped", "on foot": "ped", "walkers": "ped",
+    "pedestrians": "ped", "pedestrian": "ped", "peds": "ped", "ped": "ped", "walking": "ped", "on foot": "ped", "walkers": "ped",
     "cyclists": "cyc", "cyclist": "cyc", "bicyclists": "cyc", "bicyclist": "cyc",
     "bikes": "cyc", "bike": "cyc", "bicycle": "cyc", "bicycles": "cyc", "cycling": "cyc",
     "biking": "cyc",
@@ -209,7 +209,9 @@ def _correct_spelling(parsed: ParsedQuery, leftover: list[str]) -> list[str]:
                   if " " not in word and len(word) >= FUZZY_MIN_LETTERS}
     still_unmatched = []
     for word in leftover:
-        close = difflib.get_close_matches(word, [*vocabulary, "construction"], n=1, cutoff=FUZZY_CUTOFF)             if len(word) >= FUZZY_MIN_LETTERS else []
+        close = []
+        if len(word) >= FUZZY_MIN_LETTERS:
+            close = difflib.get_close_matches(word, [*vocabulary, "construction"], n=1, cutoff=FUZZY_CUTOFF)
         if not close:
             still_unmatched.append(word)
         elif close[0] != "construction":           # a misspelt "construction" only repeats "new construction"
@@ -238,12 +240,10 @@ def _negated_terms(text: str) -> tuple[str, list[str]]:
         text = text[:match.start()] + " " + text[match.end():]
 
 
-def parse_query(text: str | None) -> ParsedQuery:
-    """Parse a free-text query into control values, the pieces understood and the words left over."""
-    parsed = ParsedQuery(text=text or "")
-    remaining = " " + re.sub(r"[,;:!?()\"']", " ", (text or "").lower()) + " "
+SPECIFIC_HARM = ("ped", "cyc", "mot")      # road users; these win over the generic injury, fatal and all words
 
-    remaining, notes = _negated_terms(remaining)
+
+def _read_years(parsed: ParsedQuery, remaining: str, notes: list[str]) -> str:
     years, typed, remaining, clamped = _take_years(remaining)
     if typed and not years:
         notes.append(f"{typed}: the data covers {YEAR_START} to {YEAR_END}")
@@ -253,50 +253,92 @@ def parse_query(text: str | None) -> ParsedQuery:
         if clamped:
             shown += f" (data covers {YEAR_START} to {YEAR_END})"
         parsed.understood.append((typed, LABELS["years"], shown))
+    return remaining
 
-    # Place names that contain a filter word ("new" in "new york") are removed before anything else.
-    _, remaining = _take_phrases(remaining, dict.fromkeys(NEUTRAL_PHRASES))
 
-    # "near housing" must be read before the borough and construction tables see its words
+def _read_scope(parsed: ParsedQuery, remaining: str) -> str:
     found, remaining = _take_phrases(remaining, SCOPE_WORDS)
     if found:
         parsed.values["scope"] = found[0][1]
         parsed.understood.append((found[0][0], LABELS["scope"], SCOPE[found[0][1]]))
+    return remaining
 
-    # Factors come before road users, so that "pedestrian error" is read as a factor.
-    multi = [("boroughs", BOROUGH_WORDS, BOROUGHS), ("factors", FACTOR_WORDS, FACTOR_GROUPS),
-             ("hours", HOUR_WORDS, HOUR_BANDS), ("construction", CONSTRUCTION_WORDS, CONSTRUCTION_TYPES)]
-    harm_found = []
-    for key, table, canonical in multi:
-        found, remaining = _take_phrases(remaining, table)
-        if found:
-            parsed.values[key] = _ordered([value for _, value in found], canonical)
-            for phrase, value in found:
-                parsed.understood.append((phrase, LABELS[key], value))
-        if key == "factors":
-            harm_found, remaining = _take_phrases(remaining, HARM_WORDS)
 
+def _read_multi(parsed: ParsedQuery, remaining: str, key: str, table: dict, canonical: list[str]) -> str:
+    found, remaining = _take_phrases(remaining, table)
+    if found:
+        parsed.values[key] = _ordered([value for _, value in found], canonical)
+        parsed.understood.extend((phrase, LABELS[key], value) for phrase, value in found)
+    return remaining
+
+
+def _read_sizes(parsed: ParsedQuery, remaining: str) -> str:
     found, remaining = _take_phrases(remaining, SIZE_WORDS)
     if found:
-        bands = [band for _, group in found for band in group]
-        parsed.values["sizes"] = _ordered(bands, SIZE_BANDS)
+        parsed.values["sizes"] = _ordered([band for _, group in found for band in group], SIZE_BANDS)
         for phrase, group in found:
             parsed.understood.append((phrase, LABELS["sizes"], ", ".join(group) + " units"))
+    return remaining
 
-    if harm_found:
-        kinds = {value for _, value in harm_found}
-        # pedestrians and cyclists together are one option; otherwise the first road user named wins
-        if {"ped", "cyc"} <= kinds:
-            harm, used = "pedcyc", {"ped", "cyc"}
-        else:
-            harm = next(value for _, value in harm_found if value in kinds)
-            used = {harm}
-        parsed.values["harm"] = harm
-        typed = " + ".join(dict.fromkeys(phrase for phrase, value in harm_found if value in used))
-        parsed.understood.append((typed, LABELS["harm"], HARM[harm]["label"].replace(" (see note)", "")))
-        for phrase in dict.fromkeys(phrase for phrase, value in harm_found if value not in used):
+
+def _choose_harm(kinds: set[str]) -> tuple[str, set[str]]:
+    """The one 'who was harmed' option for the kinds named, and the kinds it covers.
+
+    Pedestrians with cyclists are one option. Otherwise a road user beats the generic words, so
+    "bike injuries" is cyclists and "pedestrians killed" is pedestrians.
+    """
+    if {"ped", "cyc"} <= kinds:
+        return "pedcyc", {"ped", "cyc"}
+    chosen = next((kind for kind in SPECIFIC_HARM if kind in kinds), None)
+    if chosen is None:
+        chosen = next(kind for kind in ("fatal", "injury", "all") if kind in kinds)
+    return chosen, {chosen}
+
+
+def _read_harm(parsed: ParsedQuery, harm_found: list[tuple[str, str]], notes: list[str]) -> None:
+    if not harm_found:
+        return
+    harm, used = _choose_harm({value for _, value in harm_found})
+    parsed.values["harm"] = harm
+    typed = " + ".join(dict.fromkeys(phrase for phrase, value in harm_found if value in used))
+    parsed.understood.append((typed, LABELS["harm"], HARM_SHORT[harm]))
+    has_road_user = any(value in SPECIFIC_HARM for _, value in harm_found)
+    for phrase, value in dict.fromkeys(harm_found):
+        generic_beside_road_user = has_road_user and value not in SPECIFIC_HARM
+        if value not in used and not generic_beside_road_user:
             notes.append(f"{phrase}: only one 'who was harmed' option applies at a time")
 
+
+def _link_housing_to_location(parsed: ParsedQuery) -> None:
+    """Construction and size describe the nearest housing site, so they only act on crashes near housing.
+
+    A query that names one and does not name a crash location therefore means 'near housing'.
+    """
+    restricts = make_filters(construction=parsed.values.get("construction"), sizes=parsed.values.get("sizes"))
+    if restricts.has_housing_filter and "scope" not in parsed.values:
+        parsed.values["scope"] = "near"
+        parsed.understood.append(("housing filter", LABELS["scope"], SCOPE["near"]))
+
+
+def parse_query(text: str | None) -> ParsedQuery:
+    """Parse a free-text query into control values, the pieces understood and the words left over."""
+    parsed = ParsedQuery(text=text or "")
+    remaining = " " + re.sub(r"[,;:!?()\"']", " ", (text or "").lower()) + " "
+    remaining, notes = _negated_terms(remaining)
+    remaining = _read_years(parsed, remaining, notes)
+    # "near housing" is read before the borough and construction tables see its words. Boroughs come
+    # before the place names that contain a filter word, so "new york county" is Manhattan.
+    remaining = _read_scope(parsed, remaining)
+    remaining = _read_multi(parsed, remaining, "boroughs", BOROUGH_WORDS, BOROUGHS)
+    _, remaining = _take_phrases(remaining, dict.fromkeys(NEUTRAL_PHRASES))
+    # Factors come before road users, so that "pedestrian error" is read as a factor.
+    remaining = _read_multi(parsed, remaining, "factors", FACTOR_WORDS, FACTOR_GROUPS)
+    harm_found, remaining = _take_phrases(remaining, HARM_WORDS)
+    remaining = _read_multi(parsed, remaining, "hours", HOUR_WORDS, HOUR_BANDS)
+    remaining = _read_multi(parsed, remaining, "construction", CONSTRUCTION_WORDS, CONSTRUCTION_TYPES)
+    remaining = _read_sizes(parsed, remaining)
+    _read_harm(parsed, harm_found, notes)
+    _link_housing_to_location(parsed)
     words = re.findall(r"[a-z0-9+'-]+", remaining)
     leftover = list(dict.fromkeys(word for word in words if word not in STOP_WORDS and word.strip("-'+")))
     parsed.unmatched = notes + _correct_spelling(parsed, leftover)

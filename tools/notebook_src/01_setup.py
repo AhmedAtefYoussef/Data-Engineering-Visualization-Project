@@ -10,14 +10,11 @@
 # ### 1.1 Libraries
 
 # %%
-import difflib
 import gc
 import io
 import math
 import platform
-import sys
 import time
-import warnings
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -37,14 +34,6 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import BallTree
-
-# The RQ9 sentence in Section 8 writes an f-string that reuses its own quote character, which needs
-# Python 3.12 or newer. Stopping here gives a clear message instead of a SyntaxError in the middle
-# of the notebook.
-MIN_PYTHON = (3, 12)
-assert sys.version_info >= MIN_PYTHON, (
-    f"One f-string in Section 8 reuses its own quote character, which only Python "
-    f"{MIN_PYTHON[0]}.{MIN_PYTHON[1]} or newer accepts. Found {platform.python_version()}")
 
 pd.set_option("display.max_columns", 60)
 pd.set_option("display.width", 160)
@@ -138,7 +127,6 @@ PALETTE = {
 # "no data". Borough figures also carry a label or a marker, so colour is never the only cue.
 BOROUGH_COLORS = dict(zip(BOROUGHS, ["#DDCC77", "#44AA99", "#AA4499", "#88CCEE", "#332288"]))
 SEQUENTIAL_CMAP = "viridis"   # ordered quantities
-DIVERGING_CMAP = "RdBu_r"     # quantities with a meaningful zero
 
 sns.set_theme(style="whitegrid", context="notebook")
 mpl.rcParams.update({
@@ -159,6 +147,23 @@ def finish(ax, title, xlabel, ylabel, note=None):
         ax.annotate(note, xy=(0, -0.2), xycoords="axes fraction", fontsize=8.5,
                     color=PALETTE["neutral"], va="top")
     return ax
+
+
+def show(fig=None):
+    """Lay out and draw the current figure (the one place that calls plt.show)."""
+    (fig or plt.gcf()).tight_layout()
+    plt.show()
+
+
+def interval_rows(ax, labels, estimate, low, high, null=0.0, color=None, title="", xlabel=""):
+    """Dot-and-interval chart: one row per label, a dashed line at the null value."""
+    rows = np.arange(len(labels))[::-1]
+    estimate, low, high = (np.asarray(v, dtype=float) for v in (estimate, low, high))
+    ax.errorbar(estimate, rows, xerr=[estimate - low, high - estimate], fmt="o", capsize=3,
+                color=color or PALETTE["treated"])
+    ax.axvline(null, color=PALETTE["neutral"], linestyle="--", linewidth=1)
+    ax.set_yticks(rows, labels)
+    return finish(ax, title, xlabel, "")
 
 
 def thousands(ax, axis="y"):
@@ -202,6 +207,23 @@ def say(text):
 def pct(part, whole):
     """Percentage of `part` in `whole`, safe against an empty denominator."""
     return 100 * part / whole if whole else float("nan")
+
+
+def n_pct(part, whole, digits=1):
+    """'1,234 (5.6%)': a count with its share of a total."""
+    return f"{int(part):,} ({pct(part, whole):.{digits}f}%)"
+
+
+def fmt_ci(estimate, low, high, digits=1, unit=""):
+    """'-4.6% (95% CI -11.9% to +3.3%)': an estimate with its interval."""
+    f = lambda v: f"{v:+.{digits}f}{unit}"
+    return f"{f(estimate)} (95% CI {f(low)} to {f(high)})"
+
+
+def show_table(frame, rows=20):
+    """Display a table without truncating its rows or text columns."""
+    with pd.option_context("display.max_rows", rows, "display.max_colwidth", 60):
+        display(frame)
 
 
 def log_rule(dataset, rule, action, rows_before, rows_after, affected, reason):

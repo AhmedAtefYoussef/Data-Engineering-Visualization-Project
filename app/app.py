@@ -1,11 +1,13 @@
 """Entry point. `app.app:server` is the WSGI server Vercel runs; `python -m app.app` runs it locally.
 
-The process loads the exported tables once, builds the layout, registers the callbacks and
-computes the default report so the first visitor does not wait for the bootstraps. It reads
+The process loads the exported tables once, builds the layout and registers the callbacks. The
+default report and the map grid are built on the first request that needs them, so a cold start
+stays short. It reads
 only app/data/ and imports nothing from the pipeline, the analysis package or the root config.
 """
 from __future__ import annotations
 
+import functools
 import gzip
 import json
 import logging
@@ -15,15 +17,15 @@ import dash
 from flask import Response, request
 
 from app import data
-from app.callbacks import register, report_outputs
-from app.filters import make_filters
+from app.callbacks import register
+from app.filters import YEAR_END, YEAR_START
 from app.layout import build_layout, missing_data_layout
 from app.report import GEOJSON_URL
 from app.theme import COLOR, FONTS_URL, css_variables
 
 TITLE = "Affordable housing and injury crashes in NYC"
 DESCRIPTION = ("An interactive report on affordable-housing buildings and police crash reports in "
-               "New York City, 2016 to 2025.")
+               f"New York City, {YEAR_START} to {YEAR_END}.")
 DEFAULT_PORT = 8050
 GEOJSON_MAX_AGE_S = 86_400
 
@@ -59,11 +61,16 @@ app.index_string = """<!DOCTYPE html>
 </html>"""
 
 
-def _serve_grid(payload: bytes):
-    """A view that serves the map grid, gzip-compressed, cacheable for a day."""
-    compressed = gzip.compress(payload, compresslevel=6)
+def _serve_grid(store):
+    """A view that serves the map grid, gzip-compressed, cacheable for a day. Built on first use."""
+
+    @functools.cache
+    def encoded() -> tuple[bytes, bytes]:
+        payload = json.dumps(data.grid_geojson(store), separators=(",", ":")).encode("utf-8")
+        return payload, gzip.compress(payload, compresslevel=6)
 
     def crash_grid() -> Response:
+        payload, compressed = encoded()
         accepts_gzip = "gzip" in request.headers.get("Accept-Encoding", "")
         response = Response(compressed if accepts_gzip else payload, mimetype="application/geo+json")
         if accepts_gzip:
@@ -84,9 +91,7 @@ except FileNotFoundError as error:
 else:
     app.layout = build_layout(STORE)
     register(app, STORE)
-    grid_bytes = json.dumps(data.grid_geojson(STORE), separators=(",", ":")).encode("utf-8")
-    server.add_url_rule(GEOJSON_URL, "crash_grid", _serve_grid(grid_bytes))
-    report_outputs(STORE, make_filters(), None)        # warm the caches behind the default report
+    server.add_url_rule(GEOJSON_URL, "crash_grid", _serve_grid(STORE))
     log.info("data loaded: %s crashes, %s housing rows, built %s",
              f"{STORE.meta['rows']['crashes']:,}", f"{STORE.meta['rows']['housing']:,}", STORE.meta["built_at"])
 

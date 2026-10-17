@@ -12,7 +12,7 @@ import logging
 from dash import Dash, Input, Output, State, ctx, html, no_update
 
 from app.data import Store
-from app.filters import Filters, from_dict, make_filters
+from app.filters import Filters, from_dict, make_filters, reversed_years_note
 from app.layout import EXAMPLE_QUERIES, search_hint
 from app.report import CHART_KEYS, build_report
 from app.search import ParsedQuery, parse_query
@@ -64,9 +64,9 @@ def figure_outputs() -> list[Output]:
     return outputs
 
 
-def report_outputs(store: Store, filters: Filters, query: str | None) -> list:
+def report_outputs(store: Store, filters: Filters, query: str | None, notes: list[str] | None = None) -> list:
     """Values for the generate callback: header, tiles, three per chart, the stored filters."""
-    report = build_report(store, filters, query)
+    report = build_report(store, filters, query, notes)
     values = [report["header"], report["tiles"]]
     for key in CHART_KEYS:
         panel = report["panels"][key]
@@ -114,14 +114,15 @@ def register(app: Dash, store: Store) -> None:
         """Redraw the whole report. Runs once on page load with the default filters."""
         *values, text = state
         filters, query = filters_from_controls(values), None
+        year_note = reversed_years_note(values[1], values[2])
         parsed = parse_query(text)
         if ctx.triggered_id == "search" and parsed.understood:
             # Enter in the search box: use the query itself, so a fast typist never gets a report
             # built from dropdowns that have not caught up yet.
-            filters, query = parsed.filters(), parsed.text.strip()
+            filters, query, year_note = parsed.filters(), parsed.text.strip(), None
         elif parsed.understood and parsed.filters() == filters:
             query = parsed.text.strip()          # the dropdowns still show exactly what the query set
-        return report_outputs(store, filters, query)
+        return report_outputs(store, filters, query, [year_note] if year_note else None)
 
     @app.callback(
         Output("stale-hint", "children"), Output("generate", "className"),
