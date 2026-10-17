@@ -13,8 +13,8 @@ from dash import html
 
 from app import charts, data
 from app.data import MIN_GROUP_N, Store
-from app.filters import (BUFFER_M, Filters, chips, crash_scope_text, housing_kind_text, housing_scope_text,
-                         nearest_site_text, place_text, year_text)
+from app.filters import (Filters, buffer_m, chips, crash_scope_text, housing_kind_text, housing_scope_text,
+                         baseline_text, nearest_site_text, place_text, year_text)
 from app.story import signed
 
 GEOJSON_URL = "/data/crash-grid.geojson"
@@ -61,17 +61,17 @@ def _selection_panel(store: Store, filters: Filters) -> Panel:
     baseline = store.meta["constants"]["baseline_years"]
     scope = _scope(f"Sites: {place_text(filters)} · {housing_kind_text(filters)} started after {baseline[1]}",
                    "Not applied: years and crash filters (the baseline is injury crashes in "
-                   f"{baseline[0]} to {baseline[1]})", _n(f"n = {selection['n']:,} sites"))
+                   f"{baseline_text()})", _n(f"n = {selection['n']:,} sites"))
     if selection.get("empty"):
         figure = charts.empty_figure(f"Only {selection['n']} sites match.<br>This chart needs at least {MIN_GROUP_N}.")
         return Panel(figure, scope, ["Choose more boroughs, both construction types or more size bands."])
     side = "above" if selection["excess"] > 0 else "below"
     clear = selection["low"] > 0 or selection["high"] < 0
-    note = [f"Each site is ranked among street points of its own borough by injury crashes within {BUFFER_M} m "
+    note = [f"Each site is ranked among street points of its own borough by injury crashes within {buffer_m()} m "
             f"before construction. The average site sits at the {selection['mean_percentile']:.0f}th percentile, "
             f"{abs(selection['excess']):.1f} percentile points {side} a typical street (50th). The 95% interval "
             f"is {signed(selection['low'])} to {signed(selection['high'])}, computed by resampling "
-            f"{selection['n_blocks']:,} one-kilometer blocks of sites. ",
+            f"{selection['n_blocks']:,} {selection['cluster_unit']}. ",
             "The interval excludes zero. " if clear else "The interval includes zero. ",
             "The ranking uses the years before the project started, so it shows where the buildings are and "
             "is not something the project did. The benchmark is street points, not other housing."]
@@ -132,6 +132,10 @@ def _heatmap_panel(store: Store, filters: Filters, total: int) -> Panel:
     day, hour = divmod(int(matrix.argmax()), 24)
     note = [f"The busiest cell is {charts.WEEKDAYS[day]} from {hour:02d}:00 to {hour:02d}:59 with "
             f"{int(matrix.max()):,} crashes."]
+    unknown = store.meta["rows"].get("crashes_time_unknown")
+    if unknown:   # 0:00 is the police default for a missing time (notebook Section 4)
+        note.append(f" The 00:00 hour includes {unknown:,} crashes city-wide whose time was recorded as 0:00, "
+                    "which usually means the time is unknown; the notebook leaves them out of hour-of-day results.")
     if 0 < total < 7 * 24:
         note.append(f" With {total} crashes over 168 cells, much of the pattern may be chance.")
     return Panel(charts.heatmap_figure(matrix, filters.harm_noun), scope, note)
@@ -174,16 +178,16 @@ def _event_panel(store: Store, filters: Filters) -> Panel:
     elif filters.harm in {"mot", "fatal"}:
         outcome_note = " (this outcome is not tracked per site, so injury crashes are shown)"
     counted = ", ".join(f"{count:,} {kind.lower()}" for kind, count in study["n_by_type"].items())
-    scope = _scope(f"Sites: {place_text(filters)} · {housing_kind_text(filters)}, completed 2019 to 2022",
+    scope = _scope(f"Sites: {place_text(filters)} · {housing_kind_text(filters)}, completed {data.event_cohort_text(store)}",
                    f"Outcome: {study['noun']}{outcome_note}",
                    "Not applied: years, contributing factor, time of day, crash location",
                    _n(f"n = {counted} completed; {study['n_comparison']:,} comparison"))
     if study.get("empty"):
         figure = charts.empty_figure(f"Too few usable sites for a before and after comparison.<br>"
                                      f"Each group needs at least {MIN_GROUP_N}. Sites with another completed "
-                                     f"building within {BUFFER_M} m are left out.")
+                                     f"building within {buffer_m()} m are left out.")
         return Panel(figure, scope, ["Remove the borough or size filter. Sites with another completion inside "
-                                     f"their {BUFFER_M} m circle are excluded, which leaves few per borough."])
+                                     f"their {buffer_m()} m circle are excluded, which leaves few per borough."])
     note = ["After against before, relative to comparison sites. "]
     note += [_did_sentence(kind, part["did"]) for kind, part in study["treated"].items()]
     intervals = [part["did"] for part in study["treated"].values()]
@@ -233,11 +237,13 @@ def summary_tiles(filters: Filters, numbers: dict) -> list:
     """The four numbers above the charts."""
     anywhere = numbers["crashes_anywhere"]
     near_share = f"{numbers['crashes_near'] / anywhere * 100:.0f}%" if anywhere else "n/a"
-    place = "within 250 m of housing" if filters.scope == "near" else place_text(filters)
+    place = f"within {buffer_m()} m of housing" if filters.scope == "near" else place_text(filters)
     kind = nearest_site_text(filters)
+    if filters.housing_filter_ignored:
+        place += " (housing filters apply only near housing)"
     return [
         _tile(f"{numbers['crashes']:,}", filters.harm_noun.capitalize(), f"{place}, {year_text(filters)}"),
-        _tile(near_share, f"of matching crashes are within {BUFFER_M} m of a housing site (completed or planned)",
+        _tile(near_share, f"of matching crashes are within {buffer_m()} m of a housing site (completed or planned)",
               f"{numbers['crashes_near']:,} of {anywhere:,}; {kind}"),
         _tile(f"{numbers['buildings']:,}", "Affordable-housing buildings completed",
               f"{numbers['buildings_unlocated']:,} without a public address"),
@@ -246,12 +252,13 @@ def summary_tiles(filters: Filters, numbers: dict) -> list:
     ]
 
 
-def report_header(filters: Filters, numbers: dict, query: str | None) -> list:
+def report_header(filters: Filters, numbers: dict, query: str | None, notes: list[str] | None = None) -> list:
     """Active filters as labelled chips, one sentence with the n, and any caution for this selection."""
     children = [html.Ul([html.Li([html.Span(label, className="chip-label"), value], className="chip")
                          for label, value in chips(filters)], className="chips", **{"aria-label": "Active filters"})]
     if query:
         children.insert(0, html.P(["From your search: ", html.Q(query)], className="from-search"))
+    children += [html.P(note, className="aside") for note in notes or []]
     if numbers["crashes"] == 0:
         children.append(html.Div([html.Strong("No crashes match this selection. "), _widen_hint(filters),
                                   " The housing charts below still show what was built."],
@@ -269,7 +276,7 @@ def report_header(filters: Filters, numbers: dict, query: str | None) -> list:
     return children
 
 
-def build_report(store: Store, filters: Filters, query: str | None = None) -> dict:
+def build_report(store: Store, filters: Filters, query: str | None = None, notes: list[str] | None = None) -> dict:
     """All content for one selection: header, tiles and one `Panel` per chart key."""
     numbers = data.headline_numbers(store, filters)
     total = numbers["crashes"]
@@ -284,5 +291,5 @@ def build_report(store: Store, filters: Filters, query: str | None = None) -> di
         "event": _event_panel(store, filters),
     }
     assert list(panels) == CHART_KEYS
-    return {"header": report_header(filters, numbers, query), "tiles": summary_tiles(filters, numbers),
+    return {"header": report_header(filters, numbers, query, notes), "tiles": summary_tiles(filters, numbers),
             "panels": panels, "numbers": numbers}

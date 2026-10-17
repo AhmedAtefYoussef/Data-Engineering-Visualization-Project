@@ -37,6 +37,7 @@ HARM = {
             "column": "n_all"},
 }
 DEFAULT_HARM = "injury"
+HARM_SHORT = {key: item["label"].replace(" (see note)", "") for key, item in HARM.items()}
 
 # Where the crash happened relative to the housing sites (the spatial join of the two datasets).
 SCOPE = {
@@ -44,7 +45,32 @@ SCOPE = {
     "near": "Within 250 m of a housing site",
 }
 DEFAULT_SCOPE = "city"
-BUFFER_M = 250
+
+# Study constants that live in meta.json; data.load() calls `configure` so every caption reads them from there.
+BUFFER_M = 250        # default; `configure` replaces it from meta.json (the tests check they agree)
+_CONSTANTS = {"buffer_m": BUFFER_M, "baseline_years": (2016, 2018), "event_window": 3}
+HOUSING_ONLY_NEAR = "housing filters apply only near housing"
+
+
+def configure(constants: dict) -> None:
+    """Take the buffer distance, baseline years and event window from meta.json."""
+    _CONSTANTS["buffer_m"] = int(constants["buffer_m"])
+    _CONSTANTS["baseline_years"] = tuple(constants["baseline_years"])
+    _CONSTANTS["event_window"] = int(constants["event_window"])
+
+
+def buffer_m() -> int:
+    return _CONSTANTS["buffer_m"]
+
+
+def baseline_text() -> str:
+    first, last = _CONSTANTS["baseline_years"]
+    return f"{first} to {last}"
+
+
+def pre_window_text() -> str:
+    """'-3 to -1': the years before completion that make up the event-study baseline."""
+    return f"-{_CONSTANTS['event_window']} to -1"
 
 
 @dataclass(frozen=True)
@@ -81,6 +107,11 @@ class Filters:
         return HARM[self.harm]["column"]
 
     @property
+    def housing_filter_ignored(self) -> bool:
+        """Construction or size is set but the crash location is the whole city, where they cannot apply."""
+        return self.has_housing_filter and self.scope != "near"
+
+    @property
     def has_housing_filter(self) -> bool:
         return bool(self.construction or self.sizes)
 
@@ -107,9 +138,7 @@ def _year(value, fallback: int) -> int:
 def make_filters(boroughs=None, year_from=None, year_to=None, construction=None, sizes=None,
                  factors=None, hours=None, harm=None, scope=None, source: str = "controls") -> Filters:
     """Build a valid `Filters` from raw control values. Never raises: bad input falls back to the default."""
-    first, last = _year(year_from, YEAR_START), _year(year_to, YEAR_END)
-    if first > last:                       # a reversed range is read as the same range
-        first, last = last, first
+    first, last = sorted((_year(year_from, YEAR_START), _year(year_to, YEAR_END)))   # reversed = same range
     return Filters(
         boroughs=_keep_known(boroughs, BOROUGHS),
         year_from=first, year_to=last,
@@ -127,6 +156,17 @@ def from_dict(stored: dict | None) -> Filters:
     """Inverse of `Filters.to_dict`, tolerant of missing keys."""
     names = {item.name for item in fields(Filters)}
     return make_filters(**{key: value for key, value in (stored or {}).items() if key in names})
+
+
+def reversed_years_note(year_from, year_to) -> str | None:
+    """A sentence when the dropdowns hold a reversed range (it is read the other way round), else None."""
+    try:
+        first, last = int(year_from), int(year_to)
+    except (TypeError, ValueError):
+        return None
+    if first <= last:
+        return None
+    return f"The years were entered as {first} to {last}; they are read as {last} to {first}."
 
 
 def year_text(filters: Filters) -> str:
@@ -147,24 +187,26 @@ def place_text(filters: Filters) -> str:
 
 def crash_scope_text(filters: Filters) -> str:
     """One line naming every crash-side filter in force, for chart subtitles."""
-    parts = [place_text(filters), year_text(filters), HARM[filters.harm]["label"].replace(" (see note)", "").lower()]
+    parts = [place_text(filters), year_text(filters), HARM_SHORT[filters.harm].lower()]
     if filters.factors:
         parts.append("factor: " + ", ".join(filters.factors).lower())
     if filters.hours:
         parts.append("time: " + ", ".join(filters.hours).lower())
     if filters.scope == "near":
         parts.append(nearest_site_text(filters))
+    elif filters.housing_filter_ignored:
+        parts.append(HOUSING_ONLY_NEAR + ": not applied to a city-wide count")
     return " · ".join(parts)
 
 
 def nearest_site_text(filters: Filters) -> str:
     """Wording for the crash-location filter. Only the nearest site's kind is stored, so say exactly that."""
     if not filters.has_housing_filter:
-        return f"within {BUFFER_M} m of an affordable-housing site"
+        return f"within {buffer_m()} m of an affordable-housing site"
     kind = " or ".join(filters.construction).lower() if filters.construction else ""
     size = ("with " + ", ".join(filters.sizes) + " units") if filters.sizes else ""
     wanted = " ".join(part for part in (kind, size) if part)
-    return f"nearest affordable-housing site within {BUFFER_M} m is {wanted}"
+    return f"nearest affordable-housing site within {buffer_m()} m is {wanted}"
 
 
 def housing_kind_text(filters: Filters) -> str:
@@ -196,6 +238,6 @@ def chips(filters: Filters) -> list[tuple[str, str]]:
         ("Building size", _joined(filters.sizes, "Any") + (" units" if filters.sizes else "")),
         ("Contributing factor", _joined(filters.factors, "Any")),
         ("Time of day", _joined(filters.hours, "Any")),
-        ("Who was harmed", HARM[filters.harm]["label"].replace(" (see note)", "")),
+        ("Who was harmed", HARM_SHORT[filters.harm]),
         ("Crash location", SCOPE[filters.scope]),
     ]

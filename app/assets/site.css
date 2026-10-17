@@ -412,6 +412,7 @@ body[data-report="fresh"] .tile:nth-child(4) .tile-value { animation-delay: 120m
 }
 .finding h3 { margin-bottom: var(--space-3); max-width: 44ch; font-size: var(--text-lg); line-height: 1.25; letter-spacing: -0.012em; }
 .finding-key { display: block; margin-bottom: var(--space-2); color: var(--color-ink-3); font-size: var(--text-xs); font-weight: 650; letter-spacing: 0.04em; line-height: 1.2; }
+.finding-owner { margin: 0 0 var(--space-2); color: var(--color-ink-3); font-size: var(--text-xs); }
 .finding-text p { max-width: 64ch; color: var(--color-ink-2); }
 .finding-extra { margin-top: var(--space-3); }
 .finding-number { padding-top: calc(var(--text-xs) * 1.2 + var(--space-2)); }      /* lines the figure up with the question */

@@ -16,7 +16,8 @@ import numpy as np
 import pandas as pd
 
 from app import stats
-from app.filters import BUFFER_M, Filters
+from app import filters as filter_model
+from app.filters import Filters
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 REL_YEARS = [-3, -2, -1, 0, 1, 2, 3]
@@ -104,6 +105,11 @@ def load(data_dir: Path = DATA_DIR) -> Store:
         return pd.read_parquet(data_dir / f"{name}.parquet")
 
     meta = json.loads((data_dir / "meta.json").read_text(encoding="utf-8"))
+    constants = meta["constants"]
+    if (constants["year_start"], constants["year_end"]) != (filter_model.YEAR_START, filter_model.YEAR_END):
+        raise ValueError(f"app/data covers {constants['year_start']} to {constants['year_end']} but the "
+                         "filters are built for another window; rebuild the data or update app/filters.py")
+    filter_model.configure(constants)
     store = Store(
         meta=meta, results=json.loads((data_dir / "results.json").read_text(encoding="utf-8")),
         crash=Cube.from_frame(table("crash_cube")), hour=Cube.from_frame(table("hour_cube")),
@@ -326,8 +332,14 @@ def event_outcome(filters: Filters) -> str:
     return EVENT_OUTCOME_FOR_HARM[filters.harm]
 
 
+def event_cohort_text(store: Store) -> str:
+    """'2019 to 2022': the completion years of the event-study sites."""
+    cohorts = store.event_sites.loc[store.event_sites["treated"], "cohort"]
+    return f"{int(cohorts.min())} to {int(cohorts.max())}"
+
+
 def event_study(store: Store, filters: Filters) -> dict:
-    """Crashes within 250 m of sites by year relative to completion, completed against not-yet-completed.
+    """Crashes within the buffer of sites by year relative to completion, completed against not-yet-completed.
 
     Uses the borough, construction-type, size and who-was-harmed filters. Cached, because each
     call runs up to four bootstraps.
@@ -395,7 +407,8 @@ def site_selection(store: Store, filters: Filters) -> dict:
     """Where sites stood before construction: their percentile among streets of the same borough (RQ7).
 
     Uses the borough, construction-type and size filters. Sites are the ones started after the
-    2016 to 2018 baseline; the year filter does not apply.
+    baseline (see meta.json); the year filter does not apply. The bootstrap resamples site clusters
+    (`cluster_id`, sites linked within the buffer), as the notebook does.
     """
     return _site_selection(store, filters.boroughs, filters.construction, filters.sizes)
 
@@ -416,8 +429,7 @@ def _site_selection(store: Store, boroughs: tuple, construction: tuple, sizes: t
         result["empty"] = True
         return result
     percentiles = sites["borough_percentile"].to_numpy(dtype=float)
-    blocks = sites["block_id"].to_numpy()
-    boot = stats.bootstrap_ci(stats.mean_percentile_excess, percentiles, clusters=blocks)
+    boot = stats.bootstrap_ci(stats.mean_percentile_excess, percentiles, clusters=sites["cluster_id"].to_numpy())
     n_bins = 100 // PERCENTILE_BIN_WIDTH
     bins = np.clip((percentiles // PERCENTILE_BIN_WIDTH).astype(int), 0, n_bins - 1)
     result.update({
@@ -425,14 +437,10 @@ def _site_selection(store: Store, boroughs: tuple, construction: tuple, sizes: t
         "mean_percentile": stats.NEUTRAL_PERCENTILE + boot["estimate"],
         "share_above_median": float((percentiles > stats.NEUTRAL_PERCENTILE).mean() * 100),
         "n_blocks": boot["n_clusters"],
+        "cluster_unit": "site clusters (sites within the buffer of each other)",
         "bin_share": np.bincount(bins, minlength=n_bins) / len(percentiles) * 100,
         "bin_width": PERCENTILE_BIN_WIDTH,
         "median_baseline_crashes": float(np.median(sites["baseline_crashes"])),
     })
     return result
 
-
-def near_text(filters: Filters) -> str:
-    """'within 250 m of ...' for captions."""
-    from app.filters import nearest_site_text
-    return nearest_site_text(filters)

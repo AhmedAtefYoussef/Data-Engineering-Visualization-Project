@@ -12,11 +12,11 @@ from dash import dcc, html
 
 from app import charts
 from app.data import Store
+from app.filters import YEAR_END, YEAR_START, buffer_m
+from app.stats import NEUTRAL_PERCENTILE
+from app.theme import GRAPH_CONFIG
 
 MINUS = "−"
-GRAPH_CONFIG = {"displaylogo": False, "responsive": True,
-                "modeBarButtonsToRemove": ["lasso2d", "select2d", "autoScale2d"]}
-NEUTRAL_PERCENTILE = 50        # the percentile a site would have on a typical street point
 
 
 def _graph(graph_id: str, figure, size_class: str) -> html.Div:
@@ -42,6 +42,11 @@ def _digits(unit: str) -> int:
     return 3 if "correlation" in unit else 2
 
 
+def _number_word(count: int) -> str:
+    return {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight",
+            9: "nine", 10: "ten"}.get(count, str(count))
+
+
 def _plural(count: int, one: str, many: str) -> str:
     return one if count == 1 else many
 
@@ -55,7 +60,7 @@ def hero(store: Store) -> html.Section:
     after, where = questions["RQ3"], questions["RQ7"]
     baseline = store.meta["constants"]["baseline_years"]
     return html.Section(className="hero", children=[
-        html.P("New York City, 2016 to 2025", className="eyebrow"),
+        html.P(f"New York City, {YEAR_START} to {YEAR_END}", className="eyebrow"),
         html.H1("Do injury crashes rise around affordable housing once it opens?"),
         html.P(f"New Yorkers sometimes ask whether a new affordable building will bring more people hurt on "
                f"nearby streets. We joined {rows['housing']:,} affordable-housing buildings to "
@@ -66,7 +71,7 @@ def hero(store: Store) -> html.Section:
             html.Div(className="answer answer-main", children=[
                 html.P([html.Span(f"{signed(after['estimate'])}%", className="answer-figure"),
                         html.Span("after against before", className="answer-unit")], className="answer-head"),
-                html.P(f"Injury crashes within 250 m of a new building changed by {signed(after['estimate'])}% in "
+                html.P(f"Injury crashes within {buffer_m()} m of a new building changed by {signed(after['estimate'])}% in "
                        f"the three years after completion, compared with the three years before and with the same "
                        f"change at sites not yet completed. The 95% interval runs from {signed(after['low'])}% to "
                        f"{signed(after['high'])}% ({after['n']:,} sites). It includes zero, so the records are "
@@ -123,6 +128,7 @@ def _finding_row(key: str, item: dict, extra: str | None) -> html.Li:
     return html.Li(className="finding", children=[
         html.Div(className="finding-text", children=[
             html.H3([html.Span(key, className="finding-key"), item["question"]]),
+            html.P(f"Asked by team member {item['owner']}", className="finding-owner"),
             html.P(_SAME_AS_ZERO.sub("", item["sentence"])),
             html.P(extra, className="finding-extra") if extra else None,
         ]),
@@ -172,14 +178,10 @@ def _finding_extras(store: Store) -> dict[str, str]:
                "to come from new residents. We use it as a check.",
         "RQ7": f"The benchmark is a grid of street points across each borough, so this shows where the buildings "
                f"stand. It cannot show that affordable housing is placed on busier streets than market-rate "
-               f"housing would be. Preservation sites, which are existing apartment buildings, also rank above "
-               f"the middle ({signed(rq7['preservation']['estimate'])} percentile points, "
-               f"{_range(rq7['preservation'])}), and new construction ranks {rq7['gap']['estimate']:.1f} "
-               f"percentile points higher than they do ({_range(rq7['gap'])}). That gap is mostly a difference "
-               f"between neighbourhoods: ranked inside the same ZIP code it is "
-               f"{signed(rq7['gap_within_zip']['estimate'])} points ({_range(rq7['gap_within_zip'])}). Inside "
-               f"their own ZIP code, new-construction sites are still {rq7['within_zip']['estimate']:.1f} "
-               f"percentile points above the middle ({_range(rq7['within_zip'])}).",
+               f"housing would be. Part of the gap is a difference between neighbourhoods: ranked inside their "
+               f"own ZIP code, new-construction sites are {rq7['within_zip']['estimate']:.1f} percentile points "
+               f"above the middle ({_range(rq7['within_zip'])}). All intervals resample whole clusters of "
+               f"linked sites.",
         "RQ9": f"On reported ZIP codes alone the interval is {_range(reported['rq9'], 3)}. We treat this as a "
                "hint and do not count it as a finding.",
     }
@@ -199,15 +201,14 @@ def _zip_level_text(store: Store) -> str:
     keys = sorted({key.split("_")[0].upper() for key in store.results["detail"]["reported_zips"]},
                   key=lambda key: int(key[2:]))
     names = keys[0] if len(keys) == 1 else ", ".join(keys[:-1]) + " and " + keys[-1]
-    count = {1: "One", 2: "Two", 3: "Three", 4: "Four", 5: "Five"}.get(len(keys), str(len(keys)))
-    return f"{count} of the ZIP-level results ({names})"
+    return f"{_number_word(len(keys)).capitalize()} of the ZIP-level results ({names})"
 
 
 def _findings_lead(questions: dict) -> str:
     """How many intervals include zero, which exclude it, and which of those are not kept."""
     excluding = [key for key, item in questions.items() if item["excludes_zero"]]
     not_kept = [key for key in excluding if not questions[key]["kept"]]
-    text = (f"Each of the five team members asked two questions that need both datasets; RQ1 to RQ{len(questions)} "
+    text = (f"Each of the {_number_word(len({item['owner'] for item in questions.values()}))} team members asked two questions that need both datasets; RQ1 to RQ{len(questions)} "
             f"are the question numbers used throughout this page. {len(questions) - len(excluding)} of the "
             f"{len(questions)} intervals include zero and {len(excluding)} exclude it ({', '.join(excluding)}).")
     if not_kept:
@@ -227,7 +228,7 @@ def findings(store: Store) -> html.Section:
     largest = store.results["detail"]["largest_clusters"]
     extras = _finding_extras(store)
     return html.Section(id="findings", className="band", children=[
-        html.H2("Ten questions and what the records show"),
+        html.H2(f"{_number_word(len(questions)).capitalize()} questions and what the records show"),
         html.P(_findings_lead(questions), className="section-lead"),
         html.P(f"{_interval_level_text(questions)} If it crosses the vertical zero line, the records are "
                "compatible with no change.", className="section-lead"),
@@ -242,7 +243,7 @@ def findings(store: Store) -> html.Section:
                "have measured that change in reporting.", className="prose"),
         html.P(f"Completed buildings sit in clusters. The {largest} largest clusters of neighboring sites hold "
                f"{facts['share_in_largest']:.0f}% of the {facts['sites']:,} located buildings, and the median "
-               f"building has {facts['median_neighbours']:.0f} others within 250 m. Only {facts['treated_clean']:,} "
+               f"building has {facts['median_neighbours']:.0f} others within {buffer_m()} m. Only {facts['treated_clean']:,} "
                f"of {facts['treated_candidates']:,} completed sites had no other completion nearby during their "
                f"window, and only {questions['RQ3']['n']:,} of those are new construction. The before and after "
                "comparison therefore describes the less dense edges of the program.", className="prose"),
@@ -284,7 +285,7 @@ def limits(store: Store) -> html.Section:
          "streets than other apartment buildings do."),
         ("Missing places",
          f"{limit['unlocated_share']:.1f}% of crashes have no usable coordinates "
-         f"({limit['unlocated_share_first_year']:.1f}% in 2016), and {limit['confidential_rows']:,} housing "
+         f"({limit['unlocated_share_first_year']:.1f}% in {YEAR_START}), and {limit['confidential_rows']:,} housing "
          f"records are confidential and have no address. Those buildings hold "
          f"{limit['confidential_unit_share']:.2f}% of the units and appear only in borough totals."),
         ("Recovered ZIP codes",
@@ -321,13 +322,13 @@ def impact(store: Store) -> html.Section:
          f"The housing table gives each building's start date as well as its completion date, and "
          f"{new_sites['share_above_borough_median_pct']:.0f}% of the new-construction sites stood above the "
          f"median street point of their borough for injury crashes before work began (a median of "
-         f"{new_sites['median_baseline_crashes']:.0f} within 250 m over three years, against "
+         f"{new_sites['median_baseline_crashes']:.0f} within {buffer_m()} m over three years, against "
          f"{new_sites['median_baseline_crashes_reference']:.0f} at the median street point). That record is "
          "available when a project starts, so street redesign could be timed to finish before tenants arrive. "
          "The counts are not divided by traffic, so they mark streets where many people are hurt, not streets "
          "that are riskier per trip."),
         ("Housing Preservation and Development",
-         f"Around the {after['n']:,} new-construction sites we could isolate, injury crashes within 250 m changed "
+         f"Around the {after['n']:,} new-construction sites we could isolate, injury crashes within {buffer_m()} m changed "
          f"by {signed(after['estimate'])}% after completion (95% interval {_range(after, suffix='%')}). The "
          f"records are compatible with no change, and they also allow a fall of up to "
          f"{abs(after['low']):.0f}% or a rise of up to {abs(after['high']):.0f}%. The crash record of the street "
@@ -377,8 +378,8 @@ def _robustness_text(store: Store) -> str:
     unscreened = set(store.results["detail"]["unscreened_variants"])
     screened = checks[~checks["variant"].isin(unscreened)]
     excluding = checks[checks["interval_excludes_zero"]]
-    text = (f"We changed one choice at a time: the radius, the window, the outcome, the screen for nearby "
-            f"completions, the treatment of 2020, the resampling unit and the comparison inside boroughs. "
+    text = (f"We changed one choice at a time: the radius, the outcome, the screen for nearby completions, "
+            f"the cohorts, one building per project and the comparison inside boroughs. "
             f"{len(checks) - len(excluding)} of the {len(checks)} intervals include zero. ")
     text += (f"Across the {len(screened)} versions that keep the screen, the intervals run from "
              f"{signed(screened['percent_low'].min())}% to {signed(screened['percent_high'].max())}%. ")

@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from app.filters import baseline_text, buffer_m, pre_window_text
 from app.theme import (BOROUGH_COLOR, BOROUGH_SYMBOL, COLOR, CONSTRUCTION_COLOR, CONSTRUCTION_SYMBOL,
                        SEQUENTIAL, plotly_template)
 
@@ -248,7 +249,7 @@ def event_figure(study: dict) -> go.Figure:
                           font={"size": 12, "color": COLOR["ink-3"]})
     figure.update_xaxes(title_text="Years relative to completion", tickvals=rel_years,
                         ticktext=[f"{year:+d}" if year else "0" for year in rel_years], showgrid=False)
-    figure.update_yaxes(title_text=f"{study['noun'].capitalize()} within 250 m per site<br>(mean of years -3 to -1 = 100)")
+    figure.update_yaxes(title_text=f"{study['noun'].capitalize()} within {buffer_m()} m per site<br>(mean of years {pre_window_text()} = 100)")
     figure.update_layout(legend={"orientation": "h", "y": 1.02})
     return figure
 
@@ -275,7 +276,7 @@ def selection_figure(selection: dict) -> go.Figure:
                           text=f"Typical streets: {width}% in every bar", xshift=6, yshift=3, borderpad=2,
                           bgcolor=_rgba(COLOR["surface"], 0.9),       # stays readable where it crosses a bar
                           font={"size": 12, "color": COLOR["ink-2"]})
-    figure.update_xaxes(title_text="Street percentile for injury crashes, 2016 to 2018<br>(higher = more crashes)",
+    figure.update_xaxes(title_text=f"Street percentile for injury crashes, {baseline_text()}<br>(higher = more crashes)",
                         showgrid=False, tickangle=0, range=[0, 100], tickvals=starts + [100], zeroline=False)
     figure.update_yaxes(title_text="Share of sites", ticksuffix="%", rangemode="tozero")
     return figure

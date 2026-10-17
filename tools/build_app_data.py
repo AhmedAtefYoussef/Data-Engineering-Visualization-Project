@@ -37,14 +37,14 @@ from pathlib import Path
 
 os.environ["MPLBACKEND"] = "Agg"          # must be set before matplotlib is imported: no window opens
 
-import jupytext
 import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE_DIR = ROOT / "tools" / "notebook_src"
 NOTEBOOK_DIR = ROOT / "notebooks"
 OUTPUT_DIR = ROOT / "app" / "data"
+sys.path.insert(0, str(ROOT / "tools"))
+from assemble_notebook import read_cells, section_files  # noqa: E402
 SKIPPED_SECTIONS = ("03_",)               # the EDA section defines nothing that later sections use
 
 # Map grid: square cells of about 500 m, twice the 250 m buffer, so a cell is one "street
@@ -80,15 +80,13 @@ def run_notebook_sections() -> dict:
     previous_dir = Path.cwd()
     os.chdir(NOTEBOOK_DIR)                # the notebook reads its two data files from "."
     try:
-        for path in sorted(SOURCE_DIR.glob("*.py")):
+        for path in section_files(None):
             if path.name.startswith(SKIPPED_SECTIONS):
                 continue
-            section = jupytext.reads(path.read_text(encoding="utf-8"), fmt="py:percent")
-            for number, cell in enumerate(section.cells):
-                if cell.cell_type != "code":
-                    continue
-                exec(compile(cell.source, f"{path.name}[cell {number}]", "exec"), namespace)
-                plt.close("all")          # figures are not needed; closing them frees memory
+            for cell in read_cells([path]):   # same parser as the notebook build, shared code inlined
+                if cell.cell_type == "code":
+                    exec(compile(cell.source, cell.id, "exec"), namespace)
+                    plt.close("all")      # figures are not needed; closing them frees memory
             print(f"  ran {path.name:<26} {time.time() - started:5.0f}s", flush=True)
     finally:
         os.chdir(previous_dir)
@@ -203,20 +201,23 @@ def aggregate(facts: pd.DataFrame, dimensions: list[str]) -> pd.DataFrame:
 # --------------------------------------------------------------------------------------------
 # 4. Housing and site tables
 # --------------------------------------------------------------------------------------------
-def housing_cube(housing: pd.DataFrame, years: list[int]) -> pd.DataFrame:
+def housing_cube(housing: pd.DataFrame, years: list[int], repeat: pd.Series) -> pd.DataFrame:
     """Completed buildings and units by borough, ZIP, completion year, type and size band.
 
     Confidential rows have no ZIP; they stay in with an empty ZIP so borough totals are whole.
+    A building completed again under a later project counts as a building but adds no units
+    (`repeat`, the notebook's rule in Section 5), so unit totals match the ZIP x year panel.
     """
-    done = housing[housing["is_completed"] & housing["completion_year"].isin(years)]
+    keep = housing["is_completed"] & housing["completion_year"].isin(years)
+    done, units = housing[keep], (~repeat[keep]).astype("int64")
     table = pd.DataFrame({
         "borough": done["borough"], "zip": done["zip"].fillna("").astype(str),
         "year": done["completion_year"].astype("uint16"),
         "construction_type": done["construction_type"], "size_band": done["size_band"],
         "is_located": done["is_located"],
-        "buildings": 1, "total_units": done["total_units"].astype("int64"),
-        "affordable_units": done["all_counted_units"].astype("int64"),
-        "deep_affordable_units": done["deep_affordable_units"].astype("int64"),
+        "buildings": 1, "total_units": done["total_units"].astype("int64") * units,
+        "affordable_units": done["all_counted_units"].astype("int64") * units,
+        "deep_affordable_units": done["deep_affordable_units"].astype("int64") * units,
     })
     measures = ["buildings", "total_units", "affordable_units", "deep_affordable_units"]
     dimensions = [name for name in table.columns if name not in measures]
@@ -231,7 +232,7 @@ def housing_cube(housing: pd.DataFrame, years: list[int]) -> pd.DataFrame:
 def site_table(sites: pd.DataFrame, rq7_sites: pd.DataFrame) -> pd.DataFrame:
     """Located housing sites for the map, with the RQ7 baseline percentile where it exists."""
     percentile = rq7_sites.set_index("site_id")[["baseline_crashes", "borough_percentile"]]
-    table = sites[["site_id", "block_id", "project_name", "borough", "zip", "lat", "lon",
+    table = sites[["site_id", "cluster_id", "project_name", "borough", "zip", "lat", "lon",
                    "start_year", "completion_year", "construction_type", "size_band",
                    "total_units", "all_counted_units"]].join(percentile, on="site_id")
     table = table.rename(columns={"all_counted_units": "affordable_units"})
@@ -284,9 +285,7 @@ def smallest_unsigned_frame(frame: pd.DataFrame) -> pd.DataFrame:
 # 5. Results and metadata
 # --------------------------------------------------------------------------------------------
 # Short keys for the rows of the notebook's RQ7 table (the notebook's row labels are sentences).
-RQ7_ROWS = {"new": "RQ7_NEW", "preservation": "RQ7_PRESERVED", "gap": "RQ7_GAP", "pooled": "RQ7_POOLED",
-            "within_zip": "RQ7_WITHIN_ZIP", "gap_in_borough": "RQ7_GAP_IN_BOROUGH",
-            "gap_within_zip": "RQ7_GAP_WITHIN_ZIP"}
+RQ7_ROWS = {"new": "RQ7_NEW", "pooled": "RQ7_POOLED", "within_zip": "RQ7_WITHIN_ZIP"}
 
 
 def estimate_row(row: pd.Series, estimate: str, low: str, high: str, **extra: str) -> dict:
@@ -296,13 +295,9 @@ def estimate_row(row: pd.Series, estimate: str, low: str, high: str, **extra: st
     return record
 
 
-UNSCREENED_MARKERS = ("screen switched off", "screen off", "only comparison sites screened")
-
-
 def unscreened_variants(robustness: pd.DataFrame) -> list[str]:
-    """Robustness rows that admit treated sites with other completions nearby (Section 9.5 and 9.9)."""
-    names = robustness["variant"].astype(str)
-    return [name for name in names if any(marker in name.lower() for marker in UNSCREENED_MARKERS)]
+    """Robustness rows that admit treated sites with other completions nearby."""
+    return robustness.loc[~robustness["keeps_screen"].astype(bool), "variant"].astype(str).tolist()
 
 
 def results_document(ns: dict) -> dict:
@@ -319,7 +314,7 @@ def results_document(ns: dict) -> dict:
             "n_unit": row["n_unit"], "direction": row["direction"],
             "excludes_zero": row["excludes_zero"], "kept": row["kept"],
         }
-    contrast = ns["type_contrast"]
+    contrast = ns["rq5_contrast"]
     rq7_sites, rq7_estimates = ns["rq7_sites"], ns["rq7_estimates"]
     is_new = rq7_sites["construction_type"].astype(str) == ns["NEW_CONSTRUCTION"]
     by_type = rq7_sites.groupby("construction_type", observed=True)["borough_percentile"].mean()
@@ -334,10 +329,7 @@ def results_document(ns: dict) -> dict:
                                "n": contrast.loc[name, "n_treated"]} for name in contrast.index},
         "rq7": {short: {**estimate_row(rq7_estimates.loc[ns[constant]], "estimate", "low", "high"),
                         "n": int(rq7_estimates.loc[ns[constant], "n_sites"]),
-                        "units_resampled": int(rq7_estimates.loc[ns[constant], "units_resampled"]),
-                        # The same estimate with whole linked clusters resampled (a wider, more cautious interval).
-                        "cluster_low": float(rq7_estimates.loc[ns[constant], "cluster_low"]),
-                        "cluster_high": float(rq7_estimates.loc[ns[constant], "cluster_high"])}
+                        "units_resampled": int(rq7_estimates.loc[ns[constant], "units_resampled"])}
                 for short, constant in RQ7_ROWS.items()},
         "rq7_new_sites": {
             "share_above_borough_median_pct": float((rq7_sites.loc[is_new, "borough_percentile"]
@@ -394,6 +386,7 @@ def meta_document(ns: dict, grid: dict, near_labels: list[str], out_dir: Path, s
             "housing": len(housing), "housing_located": int(housing["is_located"].sum()),
             "housing_confidential": int(housing["is_confidential"].sum()),
             "crashes": len(crashes), "injury_crashes": int(crashes["is_injury_crash"].sum()),
+            "crashes_time_unknown": int(crashes["time_unknown"].sum()),
             "crashes_located": int(crashes["is_located"].sum()),
             "crashes_near_a_site": int(crashes["near_site_id"].notna().sum()),
             "sites": len(ns["sites"]), "zip_year": len(ns["zip_year"]),
@@ -452,7 +445,7 @@ def export(ns: dict, out_dir: Path, seconds: float) -> None:
     located["cell"] = located["cell"].astype("uint16")
     write_table(aggregate(located, ["cell", "year", "borough", "factor", "hour_band", "near"]), "map_grid", out_dir)
 
-    homes = housing_cube(housing, ns["STUDY_YEARS"])
+    homes = housing_cube(housing, ns["STUDY_YEARS"], ns["is_repeat_building"](housing))
     write_table(homes, "housing_cube", out_dir)
 
     zip_year = ns["zip_year"].copy()
@@ -502,7 +495,7 @@ def check_against_notebook(ns: dict) -> None:
     notebook = ns["new_build_did"]
     for key in ["percent_change", "percent_low", "percent_high"]:
         assert abs(study["treated"][ns["NEW_CONSTRUCTION"]]["did"][key] - notebook[key]) < 1e-9, key
-    # RQ7: the headline (new construction) and the pooled row, each with its block-bootstrap interval.
+    # RQ7: the headline (new construction) and the pooled row, each with its cluster-bootstrap interval.
     estimates = ns["rq7_estimates"]
     for filters, row_name in [(new_only, ns["RQ7_NEW"]), (make_filters(), ns["RQ7_POOLED"])]:
         selection = site_data.site_selection(store, filters)

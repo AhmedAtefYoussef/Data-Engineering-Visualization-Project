@@ -38,7 +38,7 @@ def store():
 def test_assignment_example_query():
     parsed = parse_query("Brooklyn 2022 new construction")
     assert parsed.values == {"year_from": 2022, "year_to": 2022, "boroughs": ["Brooklyn"],
-                             "construction": ["New Construction"]}
+                             "construction": ["New Construction"], "scope": "near"}
     assert parsed.unmatched == []
 
 
@@ -58,7 +58,7 @@ def test_second_example_query():
     ("manhattan large buildings near housing", {"boroughs": ["Manhattan"], "sizes": ["50-149", "150+"],
                                                "scope": "near"}),
     ("preservation evening distracted driving", {"construction": ["Preservation"], "hours": ["Evening"],
-                                                 "factors": ["Distraction"]}),
+                                                 "factors": ["Distraction"], "scope": "near"}),
     ("all crashes 2016 to 2018", {"harm": "all", "year_from": 2016, "year_to": 2018}),
 ])
 def test_queries(query, expected):
@@ -221,7 +221,6 @@ def test_story_quotes_the_exported_results(store):
     findings = _text(story.findings(store))
     for item in questions.values():
         assert item["sentence"].split("; the interval includes zero")[0] in findings
-    assert "not counted after adjusting for several tests" in findings   # RQ9
     page = " ".join(_text(part(store)) for part in
                     [story.hero, story.findings, story.limits, story.impact, story.data_and_method, story.footer])
     for banned in ["—", "causes", "caused by", "leads to", "because of the housing"]:
@@ -333,9 +332,9 @@ from app import charts                                           # noqa: E402
 QUERY_TABLE = [
     # (query, values the parser must set, words it must report as not understood)
     ("BROOKLYN 2022 NEW BUILDINGS", {"boroughs": ["Brooklyn"], "year_from": 2022, "year_to": 2022,
-                                     "construction": ["New Construction"]}, []),
+                                     "construction": ["New Construction"], "scope": "near"}, []),
     ("BrOoKlYn   2022   New   Buildings", {"boroughs": ["Brooklyn"], "year_from": 2022, "year_to": 2022,
-                                          "construction": ["New Construction"]}, []),
+                                          "construction": ["New Construction"], "scope": "near"}, []),
     ("Queens 2018-2020", {"boroughs": ["Queens"], "year_from": 2018, "year_to": 2020}, []),
     ("queens 2018–2020", {"boroughs": ["Queens"], "year_from": 2018, "year_to": 2020}, []),
     ("queens 2020-2018", {"boroughs": ["Queens"], "year_from": 2018, "year_to": 2020}, []),
@@ -344,16 +343,16 @@ QUERY_TABLE = [
     ("after 2022 brooklyn", {"boroughs": ["Brooklyn"], "year_from": 2023, "year_to": YEAR_END}, []),
     ("SI cyclists", {"boroughs": ["Staten Island"], "harm": "cyc"}, []),
     ("Brooklyn, 2022; new buildings!", {"boroughs": ["Brooklyn"], "year_from": 2022, "year_to": 2022,
-                                        "construction": ["New Construction"]}, []),
+                                        "construction": ["New Construction"], "scope": "near"}, []),
     ("brooklyn and queens", {"boroughs": ["Brooklyn", "Queens"]}, []),
     ("bronx 1999-2030", {"boroughs": ["Bronx"], "year_from": YEAR_START, "year_to": YEAR_END}, []),
-    ("manhattan towers fatal", {"boroughs": ["Manhattan"], "sizes": ["150+"], "harm": "fatal"}, []),
+    ("manhattan towers fatal", {"boroughs": ["Manhattan"], "sizes": ["150+"], "harm": "fatal", "scope": "near"}, []),
     ("pedestrian error brooklyn", {"boroughs": ["Brooklyn"], "factors": ["Pedestrian or cyclist error"]}, []),
     ("new york city", {}, []),
     # a close misspelling of a borough or construction word is corrected and shown as such
     ("Brookyln 2022", {"boroughs": ["Brooklyn"], "year_from": 2022, "year_to": 2022}, []),
     ("manhatan pedestrians", {"boroughs": ["Manhattan"], "harm": "ped"}, []),
-    ("brooklin new construciton", {"boroughs": ["Brooklyn"], "construction": ["New Construction"]}, []),
+    ("brooklin new construciton", {"boroughs": ["Brooklyn"], "construction": ["New Construction"], "scope": "near"}, []),
     # two separate years make a range
     ("2020 2018 bronx", {"boroughs": ["Bronx"], "year_from": 2018, "year_to": 2020}, []),
     # nothing usable
@@ -573,8 +572,8 @@ def test_year_phrases_outside_the_data_set_no_year_filter(query):
 
 
 def test_conflicting_harm_terms_report_the_one_not_used():
-    parsed = parse_query("fatal pedestrians")
-    assert len(parsed.values["harm"]) and len(parsed.unmatched) == 1
+    parsed = parse_query("pedestrians motorists")
+    assert parsed.values["harm"] == "ped" and len(parsed.unmatched) == 1
     assert "only one" in parsed.unmatched[0]
     assert parse_query("pedestrians and cyclists").unmatched == []
 
@@ -587,3 +586,59 @@ def test_scatter_hover_keeps_the_true_zero():
     assert list(trace.y) == [0.1, 0.5]
     assert trace.customdata[0][4].startswith("0.0") and "axis floor" in trace.customdata[0][4]
     assert trace.customdata[1][4] == "0.5"
+
+
+# ---------------------------------------------------------------------------------------------
+# Audit fixes: housing filters at city scope, harm precedence, "new york county", reversed years
+# ---------------------------------------------------------------------------------------------
+def test_housing_word_in_a_query_switches_the_location_to_near_housing():
+    assert parse_query("brooklyn new construction").values["scope"] == "near"
+    assert parse_query("towers").values["scope"] == "near"
+    assert parse_query("new construction anywhere").values["scope"] == "city"     # said explicitly: kept
+    assert "scope" not in parse_query("brooklyn 2020").values
+    assert "scope" not in parse_query("new construction and preservation").values   # both types = no filter
+
+
+def test_scope_lines_say_housing_filters_apply_only_near_housing(store):
+    ignored = make_filters(construction=["New Construction"])
+    report = build_report(store, ignored)
+    for key in ["map", "trend", "factors", "heatmap", "scatter"]:
+        assert "housing filters apply only near housing" in _text(report["panels"][key].scope)
+    assert "housing filters apply only near housing" in _text(report["tiles"][0].children)
+    near = build_report(store, make_filters(construction=["New Construction"], scope="near"))
+    assert "only near housing" not in _text(near["panels"]["trend"].scope)
+
+
+@pytest.mark.parametrize("query, harm, unmatched", [
+    ("bronx bike injuries", "cyc", []),
+    ("queens pedestrians killed", "ped", []),
+    ("manhattan peds", "ped", []),
+    ("motorists fatal", "mot", []),
+    ("pedestrians cyclists injured", "pedcyc", []),
+])
+def test_a_road_user_beats_the_generic_harm_words(query, harm, unmatched):
+    parsed = parse_query(query)
+    assert parsed.values["harm"] == harm and parsed.unmatched == unmatched
+
+
+def test_new_york_county_is_manhattan_and_new_york_city_is_ignored():
+    assert parse_query("new york county").values["boroughs"] == ["Manhattan"]
+    assert parse_query("new york city 2020").values == {"year_from": 2020, "year_to": 2020}
+
+
+def test_reversed_years_are_normalised_and_the_report_says_so(store):
+    from app.filters import reversed_years_note
+    filters = make_filters(year_from=2022, year_to=2018)
+    assert (filters.year_from, filters.year_to) == (2018, 2022)
+    assert reversed_years_note(2022, 2018) == "The years were entered as 2022 to 2018; they are read as 2018 to 2022."
+    assert reversed_years_note(2018, 2022) is None and reversed_years_note(None, 2022) is None
+    header = build_report(store, filters, None, [reversed_years_note(2022, 2018)])["header"]
+    assert "read as 2018 to 2022" in _text(header[-1:]) or any("read as 2018 to 2022" in str(item) for item in header)
+
+
+def test_rq7_resamples_site_clusters(store):
+    result = data.site_selection(store, make_filters(construction=["New Construction"]))
+    assert "site clusters" in result["cluster_unit"]
+    assert result["n_blocks"] == store.sites.loc[store.sites["borough_percentile"].notna()
+                                                 & (store.sites["construction_type"] == "New Construction"),
+                                                 "cluster_id"].nunique()

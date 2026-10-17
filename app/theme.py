@@ -117,3 +117,8 @@ def plotly_template() -> go.layout.Template:
         "hovermode": "closest",
         "dragmode": "zoom",
     })
+
+
+# Plotly config shared by the explorer charts and the story figures.
+GRAPH_CONFIG = {"displaylogo": False, "responsive": True,
+                "modeBarButtonsToRemove": ["lasso2d", "select2d", "autoScale2d"]}
