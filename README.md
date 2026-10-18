@@ -108,7 +108,7 @@ Open http://127.0.0.1:8050. Set the `PORT` environment variable to use another p
 python -m pytest -q tests
 ```
 
-206 tests in two files pass. `tests/test_site.py` covers the search parser, the filters, the pre-aggregated tables (totals must agree across all of them), the chart builders, the callbacks through Flask's test client, and agreement between the site's numbers and the exported results. `tests/test_data_accuracy.py` recomputes the numbers the site shows from the two raw files with separate code and compares them with `app/data/`; it skips itself when the raw files are not in `notebooks/`.
+208 tests in two files pass. `tests/test_site.py` covers the search parser, the filters, the pre-aggregated tables (totals must agree across all of them), the chart builders, the callbacks through Flask's test client, and agreement between the site's numbers and the exported results. `tests/test_data_accuracy.py` recomputes the numbers the site shows from the two raw files with separate code and compares them with `app/data/`; it skips itself when the raw files are not in `notebooks/`.
 
 ## Deploy on Vercel
 
