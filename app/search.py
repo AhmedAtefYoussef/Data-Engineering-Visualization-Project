@@ -16,8 +16,8 @@ import difflib
 import re
 from dataclasses import dataclass, field
 
-from app.filters import (HARM_SHORT, BOROUGHS, CONSTRUCTION_TYPES, FACTOR_GROUPS, HARM, HOUR_BANDS, SCOPE,
-                         SIZE_BANDS, YEAR_END, YEAR_START, make_filters, Filters)
+from app.filters import (BOROUGHS, CONSTRUCTION_TYPES, FACTOR_GROUPS, HARM_SHORT, HOUR_BANDS, SCOPE,
+                         SIZE_BANDS, YEAR_END, YEAR_START, Filters, make_filters)
 
 # phrase -> canonical value, one table per control -------------------------------------------------
 BOROUGH_WORDS = {

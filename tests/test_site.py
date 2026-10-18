@@ -262,17 +262,20 @@ def client():
     return server.test_client()
 
 
-def _callback(client, trigger: str, values: dict):
-    """Post one callback the way the browser does and return the 'response' part of the reply."""
+def _callback(client, trigger: str, values: dict, output: str = ""):
+    """Post one callback the way the browser does and return the 'response' part of the reply.
+
+    `output` picks, among the callbacks that `trigger` fires, the one writing that output.
+    """
     dependencies = client.get("/_dash-dependencies").get_json()
-    spec = next(item for item in dependencies if any(f"{entry['id']}.{entry['property']}" == trigger
-                                                     for entry in item["inputs"]))
+    spec = next(item for item in dependencies if output in item["output"] and any(
+        f"{entry['id']}.{entry['property']}" == trigger for entry in item["inputs"]))
 
     def with_values(entries):
         return [{"id": entry["id"], "property": entry["property"],
                  "value": values.get(f"{entry['id']}.{entry['property']}")} for entry in entries]
 
-    outputs = [{"id": part.rsplit(".", 1)[0], "property": part.rsplit(".", 1)[1]}
+    outputs = [{"id": part.rsplit(".", 1)[0], "property": part.rsplit(".", 1)[1].split("@")[0]}
                for part in spec["output"].strip(".").split("...")]
     payload = {"output": spec["output"], "outputs": outputs if len(outputs) > 1 else outputs[0],
                "inputs": with_values(spec["inputs"]), "state": with_values(spec["state"]),
@@ -515,7 +518,7 @@ def test_generate_button_drives_every_chart_and_the_numbers(client):
     # the dropdowns are State, not Input: changing a dropdown must not redraw charts by itself
     inputs = {f"{i['id']}.{i['property']}" for i in spec["inputs"]}
     states = {f"{s['id']}.{s['property']}" for s in spec["state"]}
-    assert inputs == {"generate.n_clicks", "search.n_submit"}
+    assert inputs == {"generate.n_clicks", "search.n_submit", "reset.n_clicks"}
     assert {f"{control}.value" for control in CONTROL_IDS} <= states and "search.value" in states
 
 
@@ -544,6 +547,19 @@ def test_generate_with_an_impossible_selection_still_answers(client):
 def test_reset_restores_defaults(client):
     response = _callback(client, "reset.n_clicks", {"reset.n_clicks": 1, "search.value": "bronx"})
     assert [response[control_id]["value"] for control_id in CONTROL_IDS] == control_values(make_filters())
+
+
+def test_reset_also_redraws_the_report_with_defaults(client):
+    response = _callback(client, "reset.n_clicks",
+                         {"reset.n_clicks": 1, **_control_state(make_filters(boroughs=["Queens"]))}, "fig-map")
+    assert response["report-filters"]["data"] == make_filters().to_dict()
+
+
+def test_a_reversed_year_range_is_put_back_in_order(client):
+    response = _callback(client, "f-year-from.value", {"f-year-from.value": 2022, "f-year-to.value": 2018},
+                         "f-year-to")
+    values = {key.split("@")[0]: item["value"] for key, item in response.items()}
+    assert (values["f-year-from"], values["f-year-to"]) == (2018, 2022)
 
 
 def test_search_with_nothing_understood_leaves_the_dropdowns_alone(client):

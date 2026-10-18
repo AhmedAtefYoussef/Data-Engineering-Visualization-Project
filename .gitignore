@@ -10,3 +10,11 @@ notebooks/*.part
 
 # Local Claude Code settings
 .claude/
+
+# Vercel CLI and editor or OS files
+.vercel/
+.DS_Store
+Thumbs.db
+
+# Failed notebook builds (tools/assemble_notebook.py writes these instead of overwriting)
+notebooks/*.failed.ipynb
