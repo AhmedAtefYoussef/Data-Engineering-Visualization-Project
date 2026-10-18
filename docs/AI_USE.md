@@ -98,7 +98,7 @@ None. The notebook and the website make no model calls.
 
 ## 6. What this process does not cover
 
-- The deployed site. It has not been deployed. The Vercel configuration (`pyproject.toml`, `vercel.json`, `.vercelignore`) follows Vercel's documentation and has not been tried there.
+- The deployed site beyond a click-through. It runs at https://data-engineering-visualization-proj-three.vercel.app/; its search and Generate report were checked there, but its memory use and cold-start time on Vercel have not been measured.
 - The stored outputs of the committed notebook are a snapshot. Rebuild with `python tools/assemble_notebook.py --execute` after any change to a section file, and rebuild the website data with `python tools/build_app_data.py`.
 - Whether each student has read and can explain their parts. The code and text were drafted by AI assistants under the team's direction, and members remain responsible for understanding, running and checking what they submit. Nothing in this repository records that any student has done the checks below.
 

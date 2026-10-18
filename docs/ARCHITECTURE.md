@@ -87,11 +87,11 @@ If `app/data/` is missing, the page shows a short "not ready" message and the se
 
 ## Deployment
 
-`pyproject.toml` tells Vercel to serve `app.app:server`, the Flask server that Dash creates, on Python 3.12 or newer. `vercel.json` sets `maxDuration` to 60 seconds for `app/app.py`, so a cold start that builds the first report is not cut off. `requirements.txt` lists the five packages the site needs, and `requirements-dev.txt` adds what the notebook, the data build and the tests need. `.vercelignore` keeps `notebooks/`, `tools/`, `tests/` and `docs/` out of the deployment. The site needs no environment variables, disk or database. It has not been deployed yet.
+`pyproject.toml` tells Vercel to serve `app.app:server`, the Flask server that Dash creates, on Python 3.12 or newer. `vercel.json` sets `maxDuration` to 60 seconds for `app/app.py`, so a cold start that builds the first report is not cut off. `requirements.txt` lists the five packages the site needs, and `requirements-dev.txt` adds what the notebook, the data build and the tests need. `.vercelignore` keeps `notebooks/`, `tools/`, `tests/` and `docs/` out of the deployment. The site needs no environment variables, disk or database. It is deployed at https://data-engineering-visualization-proj-three.vercel.app/, redeployed on every push to `main`.
 
 ## Tests
 
-`python -m pytest -q tests` runs 206 tests (206 passed) in two files.
+`python -m pytest -q tests` runs 208 tests in two files; all pass.
 
 - `tests/test_site.py` covers the query parser, the filters, conservation of totals across every table, the chart builders, the callbacks through Flask's test client, and agreement between the site's numbers and the exported results.
 - `tests/test_data_accuracy.py` recomputes the numbers the site shows from the two raw files with separate code (casualty totals, hour bands, factor groups, coordinates, nearest site within 250 m) and compares them with `app/data/` and with what the filter path returns. It reads the raw crash file once per run and skips when the raw files are absent. Where the site differs on purpose (a borough filled from a recovered ZIP, exact-distance ties between sites) the test asserts a bound, not an equality.

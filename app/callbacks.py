@@ -105,14 +105,16 @@ def register(app: Dash, store: Store) -> None:
     @app.callback(
         Output("report-header", "children"), Output("report-tiles", "children"), *figure_outputs(),
         Output("report-filters", "data"),
-        Input("generate", "n_clicks"), Input("search", "n_submit"),
+        Input("generate", "n_clicks"), Input("search", "n_submit"), Input("reset", "n_clicks"),
         [State(control_id, "value") for control_id in CONTROL_IDS], State("search", "value"),
         running=[(Output("generate", "disabled"), True, False),
                  (Output("generate", "children"), GENERATING_LABEL, GENERATE_LABEL),
                  (Output("report", "className"), "report is-loading", "report")])
-    def generate(_clicks, _submits, *state):
-        """Redraw the whole report. Runs once on page load with the default filters."""
+    def generate(_clicks, _submits, _reset, *state):
+        """Redraw the whole report. Runs once on page load with the default filters, and on Reset."""
         *values, text = state
+        if ctx.triggered_id == "reset":          # the dropdowns are being reset in the same round trip
+            return report_outputs(store, make_filters(), None)
         filters, query = filters_from_controls(values), None
         year_note = reversed_years_note(values[1], values[2])
         parsed = parse_query(text)
@@ -123,6 +125,16 @@ def register(app: Dash, store: Store) -> None:
         elif parsed.understood and parsed.filters() == filters:
             query = parsed.text.strip()          # the dropdowns still show exactly what the query set
         return report_outputs(store, filters, query, [year_note] if year_note else None)
+
+    @app.callback(
+        Output("f-year-from", "value", allow_duplicate=True), Output("f-year-to", "value", allow_duplicate=True),
+        Input("f-year-from", "value"), Input("f-year-to", "value"),
+        prevent_initial_call=True)
+    def order_years(first, last):
+        """A reversed year range is put back in order in the dropdowns themselves."""
+        if reversed_years_note(first, last) is None:
+            return no_update, no_update
+        return last, first
 
     @app.callback(
         Output("stale-hint", "children"), Output("generate", "className"),

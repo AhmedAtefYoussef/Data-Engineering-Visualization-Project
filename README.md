@@ -2,6 +2,8 @@
 
 ICS 503 Data Engineering and Visualization, Project Milestone 1.
 
+**Live site:** https://data-engineering-visualization-proj-three.vercel.app/
+
 This project asks whether the streets around city-financed affordable housing have different crash records from comparable streets, before and after the buildings are completed. It joins two NYC Open Data tables that share no key, the housing production table and the police crash table, by ZIP code and year and by distance (crashes within 250 m of a building), and it uses injury crashes from 2016 to 2025 as the outcome. For the 128 new buildings that could be compared fairly, injury crashes within 250 m changed by -4.6% after completion relative to sites not yet completed (95% interval -11.9% to +3.3%), so the data cannot tell this from no change, and the other before-and-after questions are just as inconclusive. The clearest result concerns location before construction: new-construction sites stood on streets with more injury crashes than the typical street point of their borough, about 20 percentile points above its middle (95% interval 10.4 to 23.1). Every result is an association, the before-and-after comparison rests on a small, less densely built part of the programme, and its sign changes with how the sites are chosen (one of 11 robustness variants has an interval that excludes zero). The answers to the ten research questions are in `docs/METHODOLOGY.md`.
 
 ## Datasets
@@ -106,11 +108,13 @@ Open http://127.0.0.1:8050. Set the `PORT` environment variable to use another p
 python -m pytest -q tests
 ```
 
-206 tests in two files pass. `tests/test_site.py` covers the search parser, the filters, the pre-aggregated tables (totals must agree across all of them), the chart builders, the callbacks through Flask's test client, and agreement between the site's numbers and the exported results. `tests/test_data_accuracy.py` recomputes the numbers the site shows from the two raw files with separate code and compares them with `app/data/`; it skips itself when the raw files are not in `notebooks/`.
+208 tests in two files pass. `tests/test_site.py` covers the search parser, the filters, the pre-aggregated tables (totals must agree across all of them), the chart builders, the callbacks through Flask's test client, and agreement between the site's numbers and the exported results. `tests/test_data_accuracy.py` recomputes the numbers the site shows from the two raw files with separate code and compares them with `app/data/`; it skips itself when the raw files are not in `notebooks/`.
 
 ## Deploy on Vercel
 
-The site has not been deployed yet. Add the deployment link below once it exists.
+**Live site: https://data-engineering-visualization-proj-three.vercel.app/**
+
+The site is deployed on Vercel from `main`; every push to `main` redeploys it, and each pull request gets its own preview deployment.
 
 Vercel runs the site as one Python function. `pyproject.toml` names the entry point (`app.app:server`, the Flask server that Dash creates), `vercel.json` gives `app/app.py` a `maxDuration` of 60 seconds, `requirements.txt` lists the five packages the site needs, and `.vercelignore` keeps the notebook, tools, tests and docs out of the deployment.
 
@@ -119,9 +123,13 @@ Vercel runs the site as one Python function. `pyproject.toml` names the entry po
 3. Leave the framework preset and the build settings as Vercel detects them. The project needs no environment variables.
 4. Deploy and wait for the build to finish.
 5. Open the `vercel.app` address in a private window. Check that the page is styled, that Generate report redraws every chart, that a search such as "Brooklyn 2022 new construction" fills the filters, and that the page works at phone width.
-6. Write the address into the submission email and add it here: Deployment link: TO ADD after the first deploy.
+6. Write the address into the submission email.
 
-Three things to know. The configuration follows Vercel's documentation but has not been tried on Vercel, so the first build is the test. The function starts on demand, and nothing is precomputed at import, so the first report after a quiet period takes longer than later ones. The installed packages take about 350 MB, under Vercel's 500 MB limit for Python functions; pyarrow is the largest part that could be dropped if that limit ever becomes a problem.
+Two things to know. The function starts on demand, and nothing is precomputed at import, so the first report after a quiet period takes longer than later ones. The installed packages take about 350 MB, under Vercel's 500 MB limit for Python functions; pyarrow is the largest part that could be dropped if that limit ever becomes a problem.
+
+## Licence and credits
+
+The code is released under the MIT licence (`LICENSE`). The two datasets come from NYC Open Data and are used under its terms of use (https://www.nyc.gov/home/terms-of-use.page). The map's background tiles are © CARTO, with map data © OpenStreetMap contributors (ODbL).
 
 ## Submission checklist
 
@@ -129,7 +137,7 @@ Email ICS503Data@gmail.com by 9 November 2026 with:
 
 - [ ] the student IDs of all five members
 - [ ] the GitHub repository link
-- [ ] the deployment link
+- [ ] the deployment link (https://data-engineering-visualization-proj-three.vercel.app/)
 - [ ] the links to the two datasets (the table above)
 
 ## Team contributions
