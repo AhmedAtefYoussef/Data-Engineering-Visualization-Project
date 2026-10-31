@@ -15,6 +15,7 @@
 # %%
 PEDESTRIAN_CYCLIST_LABELS = ["Pedestrian or cyclist hurt", "Only vehicle occupants hurt"]
 ALL_BOROUGHS_LABEL = "All boroughs"
+N_BOOT_JOINT = 5000          # resamples for tables whose widened interval is read: at 99.44% about 14 replicates lie beyond each bound
 COMPOSITION_UNIT_COLUMNS = ["cluster_id", "borough", "construction_type"]   # carried by every (site, cohort) unit
 
 
@@ -66,17 +67,19 @@ def pooled_shares(counts, is_member):
     return PERCENT * totals / totals.sum() if totals.sum() > 0 else np.full(counts.shape[1], np.nan)
 
 
-def composition_shift(units, before, after, labels):
+def composition_shift(units, before, after, labels, n_boot=N_BOOT):
     """Gap in category shares (percentage points) with a cluster bootstrap; returns (table, summary).
 
     `low_joint`/`high_joint` widen the interval for the number of categories (Bonferroni): they
-    are the interval to quote for a category picked after looking at all of them.
+    are the interval to quote for a category picked after looking at all of them. A table whose
+    widened interval is the headline passes `n_boot=N_BOOT_JOINT`, since its tails are thin.
     """
     treated = units["treated"].to_numpy()
     cohort_codes, cohort_labels = pd.factorize(units["cohort"].to_numpy(), sort=True)
     n_categories = len(labels)
     boot = bootstrap_ci(lambda b, a, t, c: cohort_weighted_shifts(b, a, t, c, len(cohort_labels)).ravel(),
-                        before, after, treated, cohort_codes, clusters=units["cluster_id"].to_numpy())
+                        before, after, treated, cohort_codes, clusters=units["cluster_id"].to_numpy(),
+                        n_boot=n_boot)
     joint_level = 1 - (1 - CI_LEVEL) / n_categories
     joint = percentile_ci(boot["replicates"], level=joint_level)
     points = {key: PERCENT * np.asarray(values).reshape(3, n_categories) for key, values in
@@ -95,6 +98,7 @@ def composition_shift(units, before, after, labels):
     summary = {"n_treated_sites": int(units.loc[treated, "site_id"].nunique()),
                "n_comparison_sites": int(units.loc[~treated, "site_id"].nunique()),
                "n_clusters": boot["n_clusters"], "joint_level": joint_level,
+               "n_treated_clusters": int(units.loc[treated, "cluster_id"].nunique()),
                "treated_crashes": int(before[treated].sum() + after[treated].sum())}
     return table, summary
 
@@ -160,7 +164,7 @@ report("RQ6", "Does the pedestrian and cyclist share of injury crashes near site
        rq6_city["gap"], rq6_city["low"], rq6_city["high"], rq6_sample["n_treated_sites"],
        unit="percentage points",
        n_unit=f"completed sites, against {rq6_sample['n_comparison_sites']:,} comparison sites, in "
-              f"{rq6_sample['n_clusters']:,} clusters",
+              f"{rq6_sample['n_clusters']:,} clusters, {rq6_sample['n_treated_clusters']:,} of them with a completed site",
        subject="The gap in the pedestrian and cyclist share of injury crashes (completed minus comparison sites)",
        above="a larger rise in that share around completed buildings",
        below="a smaller rise in that share around completed buildings",
@@ -183,13 +187,16 @@ report("RQ6", "Does the pedestrian and cyclist share of injury crashes near site
 #
 # **Method.** There is no street map in the two datasets, so "typical street locations" are a
 # regular grid of points `REFERENCE_SPACING_M` apart, kept when any crash was reported within
-# `STREET_SNAP_M` m (that drops water, parks and airports). Every grid point and every site gets the
+# `STREET_SNAP_M` m in the baseline years (that drops water, parks and airports, and no later crash
+# decides which streets count). Every grid point and every site gets the
 # number of injury crashes within `BUFFER_M` m in the baseline years `BASELINE_YEARS`, and each site
 # is ranked (midrank percentile) among the grid points of its borough. Only sites started after the
 # baseline are used, so a new building cannot have affected its own count; the headline is new
 # construction. Typical locations would average `NEUTRAL_PERCENTILE`. Sites linked within 250 m
-# (the clusters of Section 5) share almost the same buffer, so whole clusters are resampled; a
-# few clusters chain through whole neighbourhoods, which makes this the cautious interval.
+# (the clusters of Section 5) share almost the same buffer, so whole clusters are resampled. A few
+# clusters chain through whole neighbourhoods and hold most of the sites, so the site-weighted mean
+# answers "where is the average building". A fourth row counts each cluster once and answers "where
+# is the average place"; the size of the excess depends on that choice of weights.
 # Alternative rejected: a cell-level correlation of units and crashes mostly measures that both are
 # absent from parks. The ranking within the site's own ZIP code separates neighbourhood from street.
 # This counts injury crashes; it is not a rate per traveller, so it says "more injury crashes", not
@@ -199,10 +206,12 @@ report("RQ6", "Does the pedestrian and cyclist share of injury crashes near site
 REFERENCE_SPACING_M = BUFFER_M     # one buffer radius, so neighbouring reference buffers overlap
 STREET_SNAP_M = 100                # metres; a point is "on a street" if a crash was ever reported this close
 PERCENTILE_BIN_WIDTH = 10          # percentile points per bin of the RQ7 histogram
+LARGEST_RQ7_CLUSTERS = 3           # clusters whose joint share of the RQ7 sites is printed
 RQ7_BOOTSTRAP_UNIT = "cluster_id"  # sites linked within BUFFER_M (Section 5) are resampled together
 RQ7_NEW = "New construction, ranked in the borough"
 RQ7_POOLED = "Both kinds pooled, ranked in the borough"
 RQ7_WITHIN_ZIP = "New construction, ranked in its own ZIP code"
+RQ7_ONE_VOTE = "New construction, ranked in the borough, one vote per cluster"
 
 
 def reference_street_points(crash_frame, tree, tree_rows):
@@ -242,7 +251,11 @@ def percentile_within_groups(values, groups, reference_values, reference_groups)
 # Baseline injury crashes within BUFFER_M of every reference point and of every site started after the baseline.
 in_baseline = (crashes["is_injury_crash"] & crashes["is_located"] & crashes["year"].between(*BASELINE_YEARS)).to_numpy()
 baseline_tree = build_haversine_tree(crashes["lat"].to_numpy()[in_baseline], crashes["lon"].to_numpy()[in_baseline])
-rq7_reference = reference_street_points(crashes, crash_tree, crash_tree_rows)
+# A street point is one with a crash of any severity in the baseline years: injury crashes alone would
+# select on the outcome, and later years would let crashes after the baseline decide which streets count.
+street_rows = np.flatnonzero((crashes["is_located"] & crashes["year"].between(*BASELINE_YEARS)).to_numpy())
+street_tree = build_haversine_tree(crashes["lat"].to_numpy()[street_rows], crashes["lon"].to_numpy()[street_rows])
+rq7_reference = reference_street_points(crashes, street_tree, street_rows)
 rq7_sites = sites[sites["start_year"] > BASELINE_YEARS[1]].copy()
 for frame in (rq7_reference, rq7_sites):
     frame["baseline_crashes"] = baseline_tree.query_radius(to_radians(frame["lat"].to_numpy(), frame["lon"].to_numpy()),
@@ -262,10 +275,16 @@ for name, column, used in [(RQ7_NEW, "borough_percentile", is_rq7_new),
                         clusters=rq7_sites.loc[used, RQ7_BOOTSTRAP_UNIT].to_numpy())
     rq7_rows[name] = {"estimate": boot["estimate"], "low": boot["low"], "high": boot["high"],
                       "n_sites": boot["n"], "units_resampled": boot["n_clusters"]}
+rq7_new_sites_table = rq7_sites[is_rq7_new]
+rq7_one_vote = one_vote_per_cluster(rq7_new_sites_table["borough_percentile"], rq7_new_sites_table[RQ7_BOOTSTRAP_UNIT])
+rq7_rows[RQ7_ONE_VOTE] = {"estimate": rq7_one_vote["estimate"], "low": rq7_one_vote["low"], "high": rq7_one_vote["high"],
+                          "n_sites": len(rq7_new_sites_table), "units_resampled": rq7_one_vote["n_clusters"]}
 rq7_estimates = pd.DataFrame(rq7_rows).T.astype(float).astype({"n_sites": int, "units_resampled": int})
 rq7_estimates["bootstrap_unit"] = RQ7_BOOTSTRAP_UNIT
 show_table(rq7_estimates.round(2))
 
+rq7_cluster_sizes = rq7_new_sites_table[RQ7_BOOTSTRAP_UNIT].value_counts()
+rq7_largest_share = pct(rq7_cluster_sizes.head(LARGEST_RQ7_CLUSTERS).sum(), len(rq7_new_sites_table))
 by_borough = rq7_sites.groupby("borough", observed=True)
 rq7_by_borough = pd.DataFrame({
     "reference_points": rq7_reference.groupby("borough", observed=True).size(),
@@ -276,6 +295,27 @@ rq7_by_borough = pd.DataFrame({
     "share_above_borough_median_pct": by_borough["borough_percentile"].apply(
         lambda values: PERCENT * (values > NEUTRAL_PERCENTILE).mean()),
 })
+
+
+def rq7_borough_views(new_sites):
+    """New construction by borough: site-weighted excess and one vote per cluster, with their intervals.
+
+    A borough under MIN_GROUP_N sites gets no site-weighted statistic and one under MIN_GROUP_N clusters no one-vote one.
+    """
+    rows = {}
+    for borough, group in new_sites.groupby("borough", observed=True):
+        percentiles, clusters = group["borough_percentile"].to_numpy(), group[RQ7_BOOTSTRAP_UNIT].to_numpy()
+        by_site = (bootstrap_ci(mean_percentile_excess, percentiles, clusters=clusters) if len(group) >= MIN_GROUP_N
+                   else {"estimate": float("nan"), "low": float("nan"), "high": float("nan")})
+        one_vote = one_vote_per_cluster(percentiles, clusters, min_clusters=MIN_GROUP_N)
+        rows[borough] = {"new_sites": len(group), "new_clusters": one_vote["n_clusters"],
+                         "new_excess": by_site["estimate"], "new_low": by_site["low"], "new_high": by_site["high"],
+                         "new_one_vote_excess": one_vote["estimate"], "new_one_vote_low": one_vote["low"],
+                         "new_one_vote_high": one_vote["high"], "new_clusters_above_pct": one_vote["share_above_pct"]}
+    return pd.DataFrame(rows).T.rename_axis("borough")
+
+
+rq7_by_borough = rq7_by_borough.join(rq7_borough_views(rq7_new_sites_table))
 show_table(rq7_by_borough.round(1))
 
 # %% [markdown]
@@ -325,18 +365,35 @@ report("RQ7", "Before the project starts, are new-construction sites on streets 
              f"Mean borough percentile by kind: " + ", ".join(f"{kind} {value:.1f}" for kind, value in rq7_by_kind.items())
              + f". Median baseline count: {rq7_sites.loc[is_rq7_new, 'baseline_crashes'].median():.0f} injury crashes at "
                f"new-construction sites against {rq7_reference['baseline_crashes'].median():.0f} at the median of "
-               f"{len(rq7_reference):,} street points.")
+               f"{len(rq7_reference):,} street points. The {LARGEST_RQ7_CLUSTERS} largest clusters hold "
+               f"{rq7_largest_share:.1f}% of these sites; counting each cluster once gives "
+               f"{rq7_one_vote['estimate']:+.1f} ({rq7_one_vote['low']:+.1f} to {rq7_one_vote['high']:+.1f}, "
+               f"{rq7_one_vote['n_clusters']:,} clusters), and {rq7_one_vote['share_above_pct']:.1f}% of clusters "
+               f"have a mean above {NEUTRAL_PERCENTILE}.")
+
+# %%
+rq7_borough_rows = rq7_by_borough[rq7_by_borough["new_one_vote_low"].notna()]
+rq7_includes_zero = rq7_borough_rows[(rq7_borough_rows["new_one_vote_low"] <= 0) & (rq7_borough_rows["new_one_vote_high"] >= 0)]
+say("One vote per cluster inside each borough (new construction): " + "; ".join(
+    f"{borough} {row['new_one_vote_excess']:+.1f} ({row['new_one_vote_low']:+.1f} to {row['new_one_vote_high']:+.1f}, "
+    f"{int(row['new_clusters'])} clusters), against {row['new_excess']:+.1f} ({row['new_low']:+.1f} to {row['new_high']:+.1f}) "
+    f"counting sites" for borough, row in rq7_borough_rows.iterrows())
+    + f". The one-vote interval includes zero in: {', '.join(rq7_includes_zero.index) or 'none'}.")
 
 # %% [markdown]
-# **Reading.** New-construction sites rank well above the typical street point of their borough,
-# and the interval stays far from zero with whole clusters resampled. Part of this is
-# neighbourhood and part is street: inside their own ZIP code the excess is smaller but still above
+# **Reading.** Citywide, new-construction sites rank above the typical street point of their
+# borough, and that direction holds with whole clusters resampled and with each cluster counted once.
+# The size does not: it depends on the weighting, because a few chained clusters with similar
+# percentiles hold most of the sites and each draw of the largest one moves the whole interval. Inside a
+# borough the site-weighted interval can reach far from its estimate, and where the largest clusters
+# stand the one-vote interval includes zero (printed above), so no borough-level direction is claimed
+# there. Part of this is neighbourhood and part is street: inside their own ZIP code the excess is smaller but still above
 # zero. Apartment buildings stand on dense blocks near avenues and transit, where more people and
 # vehicles meet, so this shows where the buildings are, not that the programme picks streets that
 # are more dangerous per traveller. For the tenants it means the street outside already had more
 # injury crashes than most of the borough before the project started. Requiring a crash within
-# `STREET_SNAP_M` drops the quietest streets (raising the benchmark), while edge points have part of
-# their buffer over water (lowering it); the net direction is unknown.
+# `STREET_SNAP_M` in the baseline years drops the quietest streets (raising the benchmark), while edge
+# points have part of their buffer over water (lowering it); the net direction is unknown.
 
 # %% [markdown]
 # ### 8.8 RQ8. Does the hour-of-day mix of injury crashes near sites shift after completion? (M4)
@@ -351,7 +408,7 @@ report("RQ7", "Before the project starts, are new-construction sites on streets 
 # %%
 band_codes = np.where(crashes["time_unknown"].to_numpy(), -1, crashes["hour_band"].cat.codes.to_numpy()).astype(np.int64)
 rq8_before, rq8_after = period_category_counts(event_units, site_pairs, crashes, band_codes, len(HOUR_BANDS))
-rq8_bands, rq8_sample = composition_shift(event_units, rq8_before, rq8_after, list(HOUR_BANDS))
+rq8_bands, rq8_sample = composition_shift(event_units, rq8_before, rq8_after, list(HOUR_BANDS), n_boot=N_BOOT_JOINT)
 rq8_band_ranges = {name: f"{first:02d}:00-{last:02d}:59" for name, (first, last) in HOUR_BANDS.items()}
 say(f"Crashes with an unknown time left out of hour-of-day work: "
     f"{n_pct(crashes['time_unknown'].sum(), len(crashes))}.")
@@ -363,7 +420,7 @@ interval_rows(ax, [f"{name} ({rq8_band_ranges[name]})" for name in rq8_bands.ind
               rq8_bands["gap"], rq8_bands["low_joint"], rq8_bands["high_joint"],
               title=f"RQ8: change in each part of the day's share of injury crashes within {BUFFER_M} m,\n"
                     f"completed minus comparison sites ({rq8_sample['n_treated_sites']:,} completed sites)",
-              xlabel=f"Gap in percentage points ({rq8_sample['joint_level']:.1%} interval, widened for "
+              xlabel=f"Gap in percentage points ({level_text(rq8_sample['joint_level'])} interval, widened for "
                      f"{len(rq8_bands)} tests)")
 show(fig)
 
@@ -374,7 +431,8 @@ report("RQ8", "Does the hour-of-day mix of injury crashes near sites shift after
        f"percentage points; largest of {len(rq8_bands)} gaps, interval widened for {len(rq8_bands)} tests",
        rq8_top["gap"], rq8_top["low_joint"], rq8_top["high_joint"], rq8_sample["n_treated_sites"],
        unit="percentage points",
-       n_unit=f"completed sites in {rq8_sample['n_clusters']:,} clusters",
+       n_unit=f"completed sites in {rq8_sample['n_clusters']:,} clusters, "
+              f"{rq8_sample['n_treated_clusters']:,} of them with a completed site",
        level=rq8_sample["joint_level"], adjusted_p=rq8_top["p_adjusted"],
        subject=f"The largest of the {len(rq8_bands)} part-of-day gaps, for the {rq8_top_band.lower()} "
                f"({rq8_band_ranges[rq8_top_band]}), with its interval widened for {len(rq8_bands)} tests,",
@@ -525,7 +583,7 @@ UNRECORDED_LABELS = [UNRECORDED_FACTOR, "Recorded factor"]
 factor_names = [name for name in crashes["factor_group"].cat.categories if name != UNRECORDED_FACTOR]
 factor_codes = pd.Categorical(crashes["factor_group"], categories=factor_names).codes.astype(np.int64)
 rq10_before, rq10_after = period_category_counts(event_units, site_pairs, crashes, factor_codes, len(factor_names))
-rq10_factors, rq10_sample = composition_shift(event_units, rq10_before, rq10_after, factor_names)
+rq10_factors, rq10_sample = composition_shift(event_units, rq10_before, rq10_after, factor_names, n_boot=N_BOOT_JOINT)
 rq10_factors = rq10_factors.sort_values("gap", ascending=False)
 
 # The check: share of all injury crashes with no factor named, pooled and for each kind of project.
@@ -548,7 +606,7 @@ interval_rows(ax, labels, [*rq10_factors["gap"], rq10_unrecorded["gap"]],
               [*rq10_factors["low_joint"], rq10_unrecorded["low"]], [*rq10_factors["high_joint"], rq10_unrecorded["high"]],
               title=f"RQ10: change in each contributing factor's share of injury crashes within {BUFFER_M} m,\n"
                     f"completed minus comparison sites (share before completion in brackets)",
-              xlabel=f"Gap in percentage points (groups: {rq10_sample['joint_level']:.1%} interval widened for "
+              xlabel=f"Gap in percentage points (groups: {level_text(rq10_sample['joint_level'])} interval widened for "
                      f"{len(rq10_factors)} tests; check: {CI_LEVEL:.0%})")
 ax.errorbar(rq10_unrecorded["gap"], 0, xerr=[[rq10_unrecorded["gap"] - rq10_unrecorded["low"]],
                                              [rq10_unrecorded["high"] - rq10_unrecorded["gap"]]],
@@ -564,7 +622,8 @@ report("RQ10", "Which contributing-factor groups are over- or under-represented 
        f"percentage points; largest of {len(rq10_factors)} gaps, interval widened for {len(rq10_factors)} tests",
        rq10_top["gap"], rq10_top["low_joint"], rq10_top["high_joint"], rq10_sample["n_treated_sites"],
        unit="percentage points",
-       n_unit=f"completed sites in {rq10_sample['n_clusters']:,} clusters",
+       n_unit=f"completed sites in {rq10_sample['n_clusters']:,} clusters, "
+              f"{rq10_sample['n_treated_clusters']:,} of them with a completed site",
        level=rq10_sample["joint_level"], adjusted_p=rq10_top["p_adjusted"],
        subject=f"The largest of the {len(rq10_factors)} factor-group gaps, for \"{rq10_top_name}\" among injury "
                f"crashes with a recorded factor, with its interval widened for {len(rq10_factors)} tests,",

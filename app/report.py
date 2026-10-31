@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
 import plotly.graph_objects as go
 from dash import html
 
@@ -75,6 +76,15 @@ def _selection_panel(store: Store, filters: Filters) -> Panel:
             "The interval excludes zero. " if clear else "The interval includes zero. ",
             "The ranking uses the years before the project started, so it shows where the buildings are and "
             "is not something the project did. The benchmark is street points, not other housing."]
+    one_vote = selection["one_vote"]
+    if np.isnan(one_vote["estimate"]):
+        note.append(f" These sites form {one_vote['n_clusters']:,} clusters, too few (under {MIN_GROUP_N}) to count each "
+                    "cluster once.")
+    else:
+        side = "excludes" if one_vote["low"] > 0 or one_vote["high"] < 0 else "includes"
+        note.append(f" Counting each cluster of linked sites once gives {signed(one_vote['estimate'])} points (interval "
+                    f"{signed(one_vote['low'])} to {signed(one_vote['high'])}, {one_vote['n_clusters']:,} clusters, {side} "
+                    "zero), so the size depends on whether buildings or places are counted.")
     if not filters.construction:
         note.append(" Both construction types are pooled here. The headline result in the Findings section "
                     "(RQ7) uses new-construction sites only.")
@@ -181,14 +191,17 @@ def _event_panel(store: Store, filters: Filters) -> Panel:
     scope = _scope(f"Sites: {place_text(filters)} · {housing_kind_text(filters)}, completed {data.event_cohort_text(store)}",
                    f"Outcome: {study['noun']}{outcome_note}",
                    "Not applied: years, contributing factor, time of day, crash location",
-                   _n(f"n = {counted} completed; {study['n_comparison']:,} comparison"))
+                   _n(f"n = {counted} completed sites in {study['n_treated_clusters']:,} of {study['n_clusters']:,} "
+                      f"clusters; {study['n_comparison_sites']:,} comparison sites ({study['n_comparison']:,} rows, "
+                      "one per cohort a site serves)"))
     if study.get("empty"):
         figure = charts.empty_figure(f"Too few usable sites for a before and after comparison.<br>"
                                      f"Each group needs at least {MIN_GROUP_N}. Sites with another completed "
                                      f"building within {buffer_m()} m are left out.")
         return Panel(figure, scope, ["Remove the borough or size filter. Sites with another completion inside "
                                      f"their {buffer_m()} m circle are excluded, which leaves few per borough."])
-    note = ["After against before, relative to comparison sites. "]
+    note = ["After against before, relative to comparison sites. Read this interval, not the overlap of the "
+            "bands: each band is resampled on its own, while this interval resamples both groups together. "]
     note += [_did_sentence(kind, part["did"]) for kind, part in study["treated"].items()]
     intervals = [part["did"] for part in study["treated"].values()]
     if all(did["percent_low"] < 0 < did["percent_high"] for did in intervals):
@@ -199,7 +212,7 @@ def _event_panel(store: Store, filters: Filters) -> Panel:
                     "that the building changed the street. ")
     skipped = [kind for kind in study["n_by_type"] if kind not in study["treated"]]
     if skipped:
-        note.append(f"{', '.join(skipped)} has fewer than {MIN_GROUP_N} usable sites here and is not drawn. ")
+        note.append(f"{', '.join(skipped)} has fewer than {MIN_GROUP_N} usable sites on one side here and is not drawn. ")
     if "Preservation" in study["treated"]:
         note.append("Preservation renovates buildings that already have residents, so a change there is not "
                     "expected to come from new residents. It works as a check. ")

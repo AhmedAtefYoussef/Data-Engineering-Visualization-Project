@@ -1,6 +1,6 @@
 {
- "built_at": "2026-10-16 23:59 UTC",
- "build_seconds": 57,
+ "built_at": "2026-10-31 15:41 UTC",
+ "build_seconds": 55,
  "datasets": {
   "housing": {
    "id": "hg8x-zxpr",
@@ -42,6 +42,7 @@
   "buffer_m": 250,
   "event_window": 3,
   "n_boot": 1000,
+  "n_boot_joint": 5000,
   "ci_level": 0.95,
   "min_group_n": 30,
   "seed": 42,
@@ -143,9 +144,9 @@
   "hour_cube.parquet": 733009,
   "housing_cube.parquet": 18158,
   "map_grid.parquet": 1233457,
-  "results.json": 14708,
-  "robustness.parquet": 13807,
-  "sites.parquet": 190971,
+  "results.json": 18312,
+  "robustness.parquet": 15611,
+  "sites.parquet": 190782,
   "zip_cube.parquet": 528451,
   "zip_year.parquet": 44437
  }

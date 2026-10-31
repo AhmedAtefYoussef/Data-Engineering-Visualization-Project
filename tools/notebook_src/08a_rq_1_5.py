@@ -118,7 +118,7 @@ fig, ax = plt.subplots(figsize=(9, 3.4))
 interval_rows(ax, list(gaps.index), gaps["mae_minus_baseline"], gaps["low"], gaps["high"], color=PALETTE["housing"],
               title=f"RQ1: change in forecast error when housing is added ({FIRST_TEST_YEAR}-{YEAR_END})",
               xlabel=f"MAE minus the MAE of crash history only (injury crashes per ZIP per year, "
-                     f"{CI_LEVEL:.0%} interval)\nright of zero = less accurate than crash history alone")
+                     f"{CI_LEVEL:.0%} interval)\nright of zero = larger error than crash history alone")
 show(fig)
 
 report("RQ1", "Does knowing a ZIP's affordable-housing completions improve an out-of-time forecast of its "
@@ -126,7 +126,7 @@ report("RQ1", "Does knowing a ZIP's affordable-housing completions improve an ou
        rq1["mae_minus_baseline"], rq1["low"], rq1["high"], int(rq1["n_test_clusters"]),
        unit="injury crashes per ZIP per year", n_unit="ZIP codes",
        subject="The change in out-of-time forecast error from adding affordable-housing completions and stock",
-       above="a less accurate forecast", below="a more accurate forecast",
+       above="a forecast that housing did not improve", below="a forecast that housing improved",
        extra=f"Fitted on {int(rq1['n_train']):,} ZIP-years ({forecast_frame['year'].min()}-{FIRST_TEST_YEAR - 1}) "
              f"and scored on {int(rq1['n_test']):,}; crash history alone misses by "
              f"{forecast_summary.loc[FORECAST_BASELINE, 'mae']:.2f} injury crashes against an average of "
@@ -137,8 +137,9 @@ report("RQ1", "Does knowing a ZIP's affordable-housing completions improve an ou
 # Housing features did not improve the forecast in this split; the extra coefficients may simply
 # be fitted to noise in a few hundred ZIP-years (not tested). The interval keeps the fitted models
 # fixed, so it understates fitting uncertainty, and the result rests on one split and one linear
-# model; Section 9.6 repeats it on crashes with a reported ZIP only. A ZIP is large, so this says
-# little about the blocks next to a building, which RQ3 looks at directly.
+# model. Section 9.6 repeats it on crashes with a reported ZIP only, and a ZIP-level result counts
+# as kept only if its interval excludes zero on both versions. A ZIP is large, so this says little
+# about the blocks next to a building, which RQ3 looks at directly.
 
 # %% [markdown]
 # ### 8.2 RQ2. Within a ZIP over time, do injury crashes move as its stock of affordable units grows? (M1)
@@ -222,9 +223,11 @@ report("RQ2", "Within a ZIP over time, do injury crashes move as the cumulative 
                          for kind, row in same_year_by_kind.items()) + " (unadjusted).")
 
 # %% [markdown]
-# A growing stock is not accompanied by a detectable movement in injury crashes, and the placebo
-# leads sit near zero, so there is no sign that ZIPs about to receive housing were already
-# diverging. The completion-year dip is the exception, but split by kind it belongs to
+# The headline slope cannot be told apart from zero, and the placebo leads sit near zero, so there
+# is no sign that ZIPs about to receive housing were already diverging. That headline leans on
+# one ZIP: Section 9.6 prints the slope on new-construction units alone and the range when each ZIP
+# is left out in turn, and the stock here counts refinanced buildings, which bring no new residents,
+# as if they were new homes. The completion-year dip is the exception, but split by kind it belongs to
 # preservation, a financing date that brings no new residents (see RQ5), and it does not carry
 # into later years; with many unadjusted tests in this notebook it is reported, not counted as a
 # finding. A hundred units is a small change for a ZIP of tens of thousands of residents, so only
@@ -271,10 +274,14 @@ new_build_sample = event_site_table[~event_site_table["treated"]
                                     | (event_site_table["construction_type"] == NEW_CONSTRUCTION)].reset_index(drop=True)
 new_build_did = event_did(new_build_sample)
 assert new_build_did["n_treated_dropped"] == 0 and new_build_did["n_control_dropped"] == 0
+new_build_sizes = used_sizes(new_build_sample["site_id"], new_build_sample["treated"], new_build_sample["cohort"],
+                             new_build_sample["cluster_id"])
+assert new_build_sizes["n_treated_sites"] == new_build_did["n_treated"], "a treated site has one cohort"
 # Placebo inside the pre-period (first to last pre-year): nothing was completed in between.
 pretrend_did = event_did(new_build_sample, before=PRE_COLUMNS[0], after=PRE_COLUMNS[-1])
 new_build_profile = event_profile(new_build_sample[REL_COLUMNS], new_build_sample["treated"],
-                                  new_build_sample["cohort"], new_build_sample["cluster_id"], len(PRE_YEARS))
+                                  new_build_sample["cohort"], new_build_sample["cluster_id"], len(PRE_YEARS),
+                                  site_ids=new_build_sample["site_id"])
 
 fig, ax = plt.subplots(figsize=(9, 5))
 ax.axhline(PRE_PERIOD_INDEX, color=PALETTE["neutral"], linewidth=1)
@@ -287,7 +294,7 @@ for group, color, marker, label in [("treated", PALETTE["treated"], "o", "New-co
         {"facecolor": "none", "edgecolor": color, "hatch": "///", "alpha": 0.45}
     ax.fill_between(REL_YEARS, line["low"], line["high"], linewidth=0.6 * (group != "treated"), **band)
     ax.plot(REL_YEARS, line["index"], color=color, marker=marker, linewidth=2, markeredgecolor="white",
-            label=f"{label} (n = {line['n_sites']:,})")
+            label=f"{label} (n = {line['n_sites']:,} sites)")
 ax.set_xticks(REL_YEARS)
 ax.legend(loc="lower left")
 finish(ax, f"RQ3: injury crashes within {BUFFER_M} m of new buildings around completion (year 0)\n"
@@ -304,15 +311,19 @@ report("RQ3", f"Do injury crashes within {BUFFER_M} m of new-construction sites 
                f"relative to comparison sites,",
        above="more injury crashes after completion than the comparison sites would suggest",
        below="fewer injury crashes after completion than the comparison sites would suggest",
-       extra=f"It uses {new_build_did['n_control']:,} comparison rows in {new_build_did['n_strata']} cohorts and "
-             f"{new_build_did['n_clusters']:,} resampled clusters. Treated sites alone changed by "
+       extra=f"It uses {new_build_sizes['n_comparison_sites']:,} comparison sites ({new_build_did['n_control']:,} "
+             f"rows, one per cohort a site serves) in {new_build_did['n_strata']} cohorts and "
+             f"{new_build_did['n_clusters']:,} resampled clusters, of which {new_build_sizes['n_treated_clusters']:,} "
+             f"hold a new-construction site. Treated sites alone changed by "
              f"{log_points_to_percent(new_build_did['treated_change']):+.1f}% and comparison sites by "
              f"{log_points_to_percent(new_build_did['control_change']):+.1f}%. The pre-period placebo "
              f"(year {PRE_YEARS[0]} to {PRE_YEARS[-1]}) is "
              f"{fmt_ci(pretrend_did['percent_change'], pretrend_did['percent_low'], pretrend_did['percent_high'], 1, '%')}.")
 
 # %% [markdown]
-# The two lines move together: most of the fall at new buildings also happened at comparison
+# The bands are resampled separately for each line, so their overlap is not the comparison; the
+# interval to read is the difference-in-differences one in the chart title, which resamples both
+# groups together. The two lines move together: most of the fall at new buildings also happened at comparison
 # streets, and what remains has an interval that includes zero. No change is detectable, but the
 # interval holds a moderate fall as well as a small rise, so this is not evidence of no change. The
 # pre-period placebo is wider than the main interval (Section 9.3 gives a narrower one).
@@ -383,6 +394,7 @@ def dose_response(sample, n_grid=DOSE_GRID_POINTS):
     adjusted = cohort_adjusted_change(change, treated, cohort_codes, len(cohort_labels))
     return {"estimate": float(boot["estimate"][0]), "low": float(boot["low"][0]), "high": float(boot["high"][0]),
             "n_treated": int(treated.sum()), "n_clusters": boot["n_clusters"],
+            "n_treated_clusters": int(sample.loc[treated, "cluster_id"].nunique()),
             "points": pd.DataFrame({"units": sample.loc[treated, "event_units"].to_numpy(dtype=float),
                                     "adjusted_change": adjusted[treated]}),
             "line": pd.DataFrame({"units": 2.0 ** grid, "fit": boot["estimate"][1:],
@@ -422,7 +434,8 @@ report("RQ4", "Does the before/after change in injury crashes at a new-construct
        extra=f"Units completed nearby range from {int(points['units'].min())} to {int(points['units'].max()):,} "
              f"(median {points['units'].median():.0f}); "
              f"{n_pct((dose_sample['event_buildings'] > 1).sum(), dose['n_treated'])} sites share their event with "
-             f"another building; {dose['n_clusters']:,} clusters are resampled.")
+             f"another building; {dose['n_clusters']:,} clusters are resampled, of which "
+             f"{dose['n_treated_clusters']:,} hold a new-construction site.")
 
 # %% [markdown]
 # No relation with size is detectable: at every size the sites scatter far more widely than any
