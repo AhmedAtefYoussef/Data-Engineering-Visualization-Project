@@ -20,7 +20,7 @@ from app import filters as filter_model
 from app.filters import Filters
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
-REL_YEARS = [-3, -2, -1, 0, 1, 2, 3]
+REL_YEARS = [-3, -2, -1, 0, 1, 2, 3]        # replaced by meta.constants.event_window when load() runs
 PRE_YEARS, POST_YEARS = [-3, -2, -1], [1, 2, 3]
 MIN_GROUP_N = 30               # the notebook's rule: no statistic for a group smaller than this
 MONTHLY_UP_TO_YEARS = 2        # the trend chart shows months when the selection is this short
@@ -31,6 +31,101 @@ EVENT_OUTCOME_FOR_HARM = {"injury": "injury", "pedcyc": "pedcyc", "ped": "pedcyc
                           "mot": "injury", "fatal": "injury", "all": "all"}
 EVENT_OUTCOME_NOUN = {"injury": "injury crashes", "pedcyc": "pedestrian and cyclist crashes",
                       "all": "reported crashes"}
+
+
+# The columns and kinds each exported table must have. "uint" and "int" are the integer families (the
+# build picks the narrowest width, so the width may change); the event table's yearly columns follow
+# the event window and are added by `expected_schema`.
+_COUNTS = {name: "uint" for name in ["n_all", "n_injury", "n_pedcyc", "n_ped", "n_cyc", "n_mot", "n_fatal"]}
+EXPECTED_SCHEMA = {
+    "crash_cube": {"year": "uint", "month": "uint", "borough": "category", "factor": "category",
+                   "hour_band": "category", "near": "category", **_COUNTS},
+    "hour_cube": {"year": "uint", "borough": "category", "factor": "category", "weekday": "uint",
+                  "hour": "uint", "near": "category", **_COUNTS},
+    "zip_cube": {"zip": "category", "year": "uint", "factor": "category", "hour_band": "category",
+                 "near": "category", **_COUNTS},
+    "map_grid": {"cell": "uint", "year": "uint", "borough": "category", "factor": "category",
+                 "hour_band": "category", "near": "category", **_COUNTS},
+    "housing_cube": {"borough": "category", "zip": "category", "year": "uint", "construction_type": "category",
+                     "size_band": "category", "is_located": "bool", "buildings": "uint", "total_units": "uint",
+                     "affordable_units": "uint", "deep_affordable_units": "uint"},
+    "zip_year": {"zip": "category", "year": "int", "borough": "category", "buildings_completed": "uint",
+                 "units_completed": "uint", "affordable_units_completed": "uint", "deep_affordable_units": "uint",
+                 "new_construction_units": "uint", "preservation_units": "uint", "cum_affordable_units": "uint",
+                 "cum_deep_affordable_units": "uint", "crashes": "uint", "injury_crashes": "uint",
+                 "persons_injured": "uint", "persons_killed": "uint", "ped_cyc_crashes": "uint",
+                 "crashes_zip_imputed": "uint", "injury_crashes_zip_imputed": "uint"},
+    "sites": {"site_id": "int", "cluster_id": "int", "project_name": "object", "borough": "category",
+              "zip": "category", "lat": "float", "lon": "float", "start_year": "int", "completion_year": "float",
+              "construction_type": "category", "size_band": "category", "total_units": "int",
+              "affordable_units": "int", "baseline_crashes": "float", "borough_percentile": "float"},
+    "event_sites": {"site_id": "int", "cohort": "int", "cluster_id": "int", "borough": "category",
+                    "construction_type": "category", "size_band": "category", "total_units": "int",
+                    "treated": "bool"},
+    "city_year": {"year": "int", "crashes": "int", "injury_crashes": "int", "persons_injured": "int",
+                  "persons_killed": "int", "ped_cyc_crashes": "int", "injury_share": "float",
+                  "deaths_per_1000_injury_crashes": "float", "crash_index": "float", "injury_crash_index": "float"},
+    "robustness": {"check": "object", "variant": "object", "kind": "object", "keeps_screen": "bool",
+                   "n_treated": "int", "n_comparison": "int", "n_comparison_sites": "int",
+                   "n_treated_dropped": "int", "n_comparison_dropped": "int", "n_resampled_units": "int",
+                   "n_treated_clusters": "int", "n_strata": "int", "treated_change": "float",
+                   "comparison_change": "float", "estimate": "float", "low": "float", "high": "float",
+                   "p_value": "float", "percent_change": "float", "percent_low": "float",
+                   "percent_high": "float", "interval_excludes_zero": "bool"},
+    "cleaning_log": {"dataset": "object", "rule": "object", "action": "object", "rows_before": "int",
+                     "rows_after": "int", "affected": "int", "reason": "object"},
+}
+EVENT_OUTCOME_PREFIXES = ["injury", "all", "pedcyc"]
+
+
+class DataContractError(ValueError):
+    """The files in app/data/ do not match what this code reads. Rebuild with tools/build_app_data.py."""
+
+
+def dtype_kind(dtype) -> str:
+    """The family of a pandas dtype: category, uint, int, float, bool or object."""
+    if isinstance(dtype, pd.CategoricalDtype):
+        return "category"
+    if pd.api.types.is_bool_dtype(dtype):
+        return "bool"
+    if pd.api.types.is_unsigned_integer_dtype(dtype):
+        return "uint"
+    if pd.api.types.is_integer_dtype(dtype):
+        return "int"
+    if pd.api.types.is_float_dtype(dtype):
+        return "float"
+    return "object"
+
+
+def expected_schema(name: str, event_window: int) -> dict[str, str]:
+    """Expected columns of one table; the event table's yearly columns follow the event window."""
+    columns = dict(EXPECTED_SCHEMA[name])
+    if name == "event_sites":
+        for prefix in EVENT_OUTCOME_PREFIXES:
+            for rel_year in range(-event_window, event_window + 1):
+                columns[f"{prefix}_{rel_year:+d}"] = "uint"
+    return columns
+
+
+def check_table(name: str, frame: pd.DataFrame, event_window: int, recorded: dict | None) -> None:
+    """Raise DataContractError naming the table and column when a table is not what the code reads."""
+    fix = "rebuild with: python tools/build_app_data.py"
+    expected = expected_schema(name, event_window)
+    for column, kind in expected.items():
+        if column not in frame.columns:
+            raise DataContractError(f"table '{name}' has no column '{column}'; {fix}")
+        actual = dtype_kind(frame[column].dtype)
+        if actual != kind:
+            raise DataContractError(f"table '{name}', column '{column}' is {frame[column].dtype} ({actual}), "
+                                    f"expected {kind}; {fix}")
+    extra = [column for column in frame.columns if column not in expected]
+    if extra:
+        raise DataContractError(f"table '{name}' has unexpected column '{extra[0]}'; {fix}")
+    if recorded is not None:
+        for column, dtype in recorded.items():
+            if column in frame.columns and str(frame[column].dtype) != dtype:
+                raise DataContractError(f"table '{name}', column '{column}' is {frame[column].dtype} but "
+                                        f"meta.json recorded {dtype}; the files and meta.json are from different builds")
 
 
 # The exported tables carry the notebook's spelling of one factor label; the site shows US spelling.
@@ -97,18 +192,29 @@ class Store:
 
 @lru_cache(maxsize=1)
 def load(data_dir: Path = DATA_DIR) -> Store:
-    """Read every exported file. Raises FileNotFoundError with the fix if the data was never built."""
+    """Read every exported file and check it against the schema the code expects.
+
+    Raises FileNotFoundError with the fix if the data was never built, and DataContractError
+    (naming the table and column) if a table has a missing, unexpected or wrongly typed column.
+    """
+    global REL_YEARS
     if not (data_dir / "meta.json").exists():
         raise FileNotFoundError(f"{data_dir} has no data. Run: python tools/build_app_data.py")
-
-    def table(name: str) -> pd.DataFrame:
-        return pd.read_parquet(data_dir / f"{name}.parquet")
 
     meta = json.loads((data_dir / "meta.json").read_text(encoding="utf-8"))
     constants = meta["constants"]
     if (constants["year_start"], constants["year_end"]) != (filter_model.YEAR_START, filter_model.YEAR_END):
         raise ValueError(f"app/data covers {constants['year_start']} to {constants['year_end']} but the "
                          "filters are built for another window; rebuild the data or update app/filters.py")
+    window = int(constants["event_window"])
+    recorded = meta.get("schema", {})
+
+    def table(name: str) -> pd.DataFrame:
+        frame = pd.read_parquet(data_dir / f"{name}.parquet")
+        check_table(name, frame, window, recorded.get(name))
+        return frame
+
+    REL_YEARS = list(range(-window, window + 1))
     filter_model.configure(constants)
     store = Store(
         meta=meta, results=json.loads((data_dir / "results.json").read_text(encoding="utf-8")),
