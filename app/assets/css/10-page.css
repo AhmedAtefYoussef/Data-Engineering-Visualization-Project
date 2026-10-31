@@ -52,7 +52,7 @@ main { display: block; }
 @media (max-width: 960px) {
   .chapter, .band { padding-block: var(--space-8); }
   .thread { display: none; }
-  .hero { max-width: none; justify-content: flex-end; }
+  .hero { max-width: none; justify-content: flex-end; padding-top: 7rem; }
   .hero h1 { text-shadow: 0 2px 24px var(--color-page), 0 0 2px var(--color-page); }
   .masthead { flex-direction: column; align-items: stretch; gap: 0; padding-block: var(--space-2) 0; background: color-mix(in srgb, var(--tint) 86%, transparent); backdrop-filter: blur(14px); }
   .nav { margin-inline: calc(-1 * var(--space-2)); }

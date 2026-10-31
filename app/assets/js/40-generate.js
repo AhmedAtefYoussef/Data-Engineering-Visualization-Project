@@ -6,8 +6,8 @@
   "use strict";
 
   var NYC = window.NYC;
-  var MIN_MS = 2300, STEP_MS = 620, MAX_WAIT_MS = 15000, OUT_MS = 900, POINTS = 1800;
-  var armed = false, overlay = null, raf = 0, startedAt = 0, finishing = false, done = false, fallback = 0;
+  var MIN_MS = 2300, STEP_MS = 620, MAX_WAIT_MS = 15000, OUT_MS = 900, POINTS = 1800, POLL_MS = 80;
+  var armed = false, overlay = null, raf = 0, startedAt = 0, finishing = false, done = false, fallback = 0, poll = 0;
 
   function steps() {
     var facts = document.getElementById("facts"), d = facts ? facts.dataset : {};
@@ -62,7 +62,7 @@
     var cloud = reduced ? [] : points(width, height);
 
     function frame(now) {
-      var elapsed = now - startedAt, form = NYC.easeOut(Math.min(1, elapsed / (MIN_MS * 0.8)));
+      var elapsed = Math.max(0, now - startedAt), form = NYC.easeOut(Math.min(1, elapsed / (MIN_MS * 0.8)));
       var step = Math.min(texts.length - 1, Math.floor(elapsed / STEP_MS));
       if (step !== stepShown) {
         stepShown = step;
@@ -88,16 +88,18 @@
         context.lineWidth = 1.5;
         context.beginPath(); context.arc(width / 2, height / 2, ring * Math.max(width, height) * 0.6, 0, 6.283); context.stroke();
       }
-      maybeFinish(now);
       if (overlay) { raf = window.requestAnimationFrame(frame); }
     }
     raf = window.requestAnimationFrame(frame);
     fallback = window.setTimeout(function () { done = true; }, MAX_WAIT_MS);   // the page never stays covered
+    // A timer, not the drawing loop, ends the sequence: it still runs in a hidden tab or if a frame fails.
+    poll = window.setInterval(maybeFinish, POLL_MS);
   }
 
-  function maybeFinish(now) {
-    if (!done || finishing || now - startedAt < MIN_MS) { return; }
+  function maybeFinish() {
+    if (!done || finishing || performance.now() - startedAt < MIN_MS) { return; }
     finishing = true;
+    window.clearInterval(poll);
     var target = document.getElementById("report");
     if (target) { target.scrollIntoView({ block: "start", behavior: "instant" }); }
     document.documentElement.style.overflow = "";
