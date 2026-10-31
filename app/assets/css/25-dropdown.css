@@ -1,0 +1,93 @@
+/* dcc.Dropdown restyled with the tokens. */
+/* dcc.Dropdown (react-select), restyled with the tokens. One height for every part: the control,
+   and the value inside it are sized from --control-h, so text sits
+   on the same line whether a filter is empty, holds one value or holds several. */
+.dropdown { --control-h: 3rem; font-size: var(--text-base); }
+.dropdown .Select-control {
+  display: flex; align-items: center; min-height: var(--control-h); height: auto;
+  border: 1px solid var(--color-line-strong); border-radius: var(--radius);
+  background: var(--color-surface); box-shadow: none; cursor: pointer;
+  transition: border-color var(--duration-fast) ease-out, background-color var(--duration-fast) ease-out;
+}
+.dropdown .Select-control:hover { border-color: var(--color-ink-3); box-shadow: none; }
+.dropdown.is-focused > .Select-control, .dropdown.is-open > .Select-control {
+  border-color: var(--color-accent); outline: 3px solid var(--color-accent); outline-offset: 1px; box-shadow: none;
+}
+/* A filter that is narrowing the report looks different from one left on its default. */
+.dropdown.Select--multi.has-value > .Select-control { background: var(--color-accent-soft); border-color: var(--color-accent); }
+.dropdown .Select-multi-value-wrapper {
+  flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  min-height: calc(var(--control-h) - 2px); padding: 5px 0 5px var(--space-3);
+}
+.dropdown .Select-placeholder, .dropdown.Select--single > .Select-control .Select-value {
+  display: flex; align-items: center; top: 0; bottom: 0; height: auto; line-height: 1.3;
+  padding-left: var(--space-3); padding-right: 3rem; color: var(--color-ink-3);
+}
+/* A long value takes a second line instead of being cut off; two lines fit inside the control. */
+.dropdown.Select--single > .Select-control .Select-value { white-space: normal; line-height: 1.2; }
+.dropdown.Select--single > .Select-control .Select-value .Select-value-label,
+.dropdown.has-value.Select--single > .Select-control .Select-value .Select-value-label {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  color: var(--color-ink); white-space: normal;
+}
+.dropdown .Select-input { height: auto; padding: 0; margin: 0; }
+.dropdown .Select-input:focus { outline: none; }     /* the control draws the ring */
+.dropdown .Select-input > input { padding: 0; line-height: 1.6; color: var(--color-ink); font: inherit; }
+/* The arrow and the clear button are full-height targets, not the small glyphs react-select draws. */
+.dropdown .Select-arrow-zone, .dropdown .Select-clear-zone {
+  flex: none; display: flex; align-items: center; justify-content: center; align-self: stretch;
+  width: 2.5rem; padding: 0; color: var(--color-ink-3);
+}
+.dropdown .Select-clear-zone { width: 2rem; border-radius: calc(var(--radius) - 2px); }
+.dropdown .Select-clear-zone:hover { color: var(--color-ink); background: var(--color-sunken); }
+.dropdown .Select-clear { font-size: 1.35rem; line-height: 1; }
+.dropdown .Select-arrow, .dropdown.is-open .Select-arrow {
+  position: static; width: 0.55rem; height: 0.55rem; border: solid var(--color-ink-2); border-width: 0 2px 2px 0;
+  transform: translateY(-25%) rotate(45deg); transition: transform var(--duration-fast) var(--ease-out);
+}
+.dropdown.is-open .Select-arrow { border-color: var(--color-accent-strong); transform: translateY(15%) rotate(-135deg); }
+.dropdown .Select-menu-outer {
+  margin-top: 6px; border: 1px solid var(--color-line-strong); border-radius: var(--radius); overflow: hidden;
+  background: var(--color-surface); box-shadow: var(--shadow-raised); z-index: 30;
+  animation: arrive var(--duration-fast) var(--ease-out);
+}
+.dropdown.is-disabled > .Select-control { background: var(--color-sunken); cursor: not-allowed; }
+/* Menu rows. The row height comes from the component (OPTION_HEIGHT_PX in layout.py places each
+   row), so no height is set here: a CSS height that disagreed would make rows overlap. Rows are
+   separated by a hairline drawn inside the row, which costs no height. */
+.dropdown .Select-menu { padding: 0; }
+.dropdown .Select-option, .dropdown .VirtualizedSelectOption {
+  display: flex; align-items: center; box-sizing: border-box; padding: 0 var(--space-4);
+  background: var(--color-surface); color: var(--color-ink); font-size: 0.9375rem; line-height: 1.25; cursor: pointer;
+  white-space: normal; overflow: hidden;      /* a long option wraps to a second line; two lines fit the row */
+  box-shadow: inset 0 -1px 0 var(--color-line);
+}
+.dropdown .Select-option.is-focused, .dropdown .VirtualizedSelectFocusedOption {
+  background: var(--color-accent-soft);
+  box-shadow: inset 3px 0 0 var(--color-accent), inset 0 -1px 0 var(--color-line);
+}
+.dropdown .Select-option.is-selected, .dropdown .VirtualizedSelectSelectedOption { font-weight: 650; color: var(--color-accent-strong); }
+.dropdown .Select-option.is-selected::after, .dropdown .VirtualizedSelectSelectedOption::after {
+  content: ""; margin-left: auto; width: 0.4rem; height: 0.75rem; flex: none;
+  border: solid var(--color-accent-strong); border-width: 0 2px 2px 0; transform: translateY(-15%) rotate(45deg);
+}
+/* A chosen value: the label first, then a remove button big enough to hit. */
+.dropdown.Select--multi .Select-value {
+  display: inline-flex; flex-direction: row-reverse; align-items: stretch; margin: 0; max-width: 100%;
+  border: 1px solid var(--color-accent); border-radius: 999px; overflow: hidden;
+  background: var(--color-surface); color: var(--color-accent-strong); font-size: var(--text-sm); line-height: 1.5;
+}
+.dropdown.Select--multi .Select-value-label { padding: 3px 4px 3px 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dropdown.Select--multi .Select-value-icon {
+  display: flex; align-items: center; justify-content: center; min-width: 1.75rem; padding: 0 6px 1px;
+  border: 0; font-size: 1.1rem; line-height: 1; color: var(--color-accent-strong); cursor: pointer;
+}
+.dropdown.Select--multi .Select-value-icon:hover { background: var(--color-accent); color: var(--color-on-accent); }
+.dropdown .Select-noresults { padding: var(--space-3) var(--space-4); color: var(--color-ink-3); font-size: var(--text-sm); }
+
+@media (pointer: coarse) {
+  .dropdown { --control-h: 3.25rem; }
+  .dropdown .Select-option, .dropdown .VirtualizedSelectOption { font-size: var(--text-base); line-height: 1.2; }
+  .dropdown.Select--multi .Select-value-icon { min-width: 2.5rem; }
+  .dropdown.Select--multi .Select-value-label { padding: 7px 4px 7px 14px; }
+}

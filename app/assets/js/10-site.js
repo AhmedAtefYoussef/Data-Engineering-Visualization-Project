@@ -13,11 +13,8 @@
    Both are re-applied after every re-render through one throttled MutationObserver.
 
    3. A new report. When #report stops loading, <body> carries data-report="fresh" for a moment;
-      site.css uses it to settle the four headline numbers into place. Nothing is set when the
-      reader asks for reduced motion.
-
-   4. The section in view. The matching masthead link gets aria-current, which site.css draws
-      as a rule under the link. */
+      assets/css/30-explore.css uses it to settle the four headline numbers into place. Nothing is set when the
+      reader asks for reduced motion. */
 (function () {
   "use strict";
 
@@ -25,7 +22,7 @@
   var coarsePointer = window.matchMedia("(pointer: coarse)").matches;
 
   function nameComboboxes() {
-    document.querySelectorAll(".field .dash-dropdown").forEach(function (dropdown) {
+    document.querySelectorAll(".dash-dropdown").forEach(function (dropdown) {
       var label = document.getElementById(dropdown.id + "-label");
       var combobox = dropdown.querySelector("[role='combobox']");
       if (label && combobox && combobox.getAttribute("aria-labelledby") !== label.id) {
@@ -65,40 +62,12 @@
     }).observe(report, { attributes: true, attributeFilter: ["class"] });
   }
 
-  var spying = false;
-  function watchSections() {
-    var links = document.querySelectorAll(".nav a[href^='#']");
-    if (spying || !links.length || !("IntersectionObserver" in window)) { return; }
-    spying = true;
-    var visible = {};
-    var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) { visible[entry.target.id] = entry.isIntersecting; });
-      var current = null;                       // the first section, in page order, that crosses the reading line
-      links.forEach(function (link) {
-        var id = link.getAttribute("href").slice(1);
-        if (current === null && visible[id]) { current = id; }
-      });
-      links.forEach(function (link) {
-        if (link.getAttribute("href").slice(1) === current) {
-          link.setAttribute("aria-current", "true");
-        } else {
-          link.removeAttribute("aria-current");
-        }
-      });
-    }, { rootMargin: "-30% 0px -65% 0px" });    // a thin band about a third of the way down the window
-    links.forEach(function (link) {
-      var section = document.getElementById(link.getAttribute("href").slice(1));
-      if (section) { observer.observe(section); }
-    });
-  }
-
   var scheduled = false;
   function refresh() {
     scheduled = false;
     nameComboboxes();
     freeTouchScroll();
     watchReport();
-    watchSections();
   }
 
   function start() {

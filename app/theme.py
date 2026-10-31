@@ -9,32 +9,35 @@ from __future__ import annotations
 
 import plotly.graph_objects as go
 
-# Type: an editorial pairing. Newsreader (a text-and-display serif drawn for news) sets the question,
-# the section headings and the headline figures; Public Sans (the plain civic sans of the US Web Design
-# System) sets body text, controls and every chart. Both come from Google Fonts with font-display: swap.
-# The "... Fallback" families are declared in site.css as local system fonts scaled to the same average
-# glyph width, so text does not reflow when the web fonts arrive.
-FONT_STACK = '"Public Sans", "Public Sans Fallback", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif'
-FONT_DISPLAY = '"Newsreader", "Newsreader Fallback", Georgia, "Times New Roman", serif'
-FONTS_URL = ("https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400..700"
-             "&family=Public+Sans:wght@400..700&display=swap")
+# Type: Schibsted Grotesk sets titles and figures; Hanken Grotesk sets text, controls and charts. Both are
+# variable faces from Google Fonts with tabular figures, loaded with font-display: swap. The "... Fallback"
+# families are declared in assets/css/00-base.css as local system fonts with matched metrics.
+FONT_STACK = '"Hanken Grotesk", "Hanken Grotesk Fallback", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif'
+FONT_DISPLAY = '"Schibsted Grotesk", "Schibsted Grotesk Fallback", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif'
+FONTS_URL = ("https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..700"
+             "&family=Hanken+Grotesk:wght@400..700&display=swap")
 
 COLOR = {
     # surfaces and lines (cool neutrals, light theme only)
-    "page": "#f3f5f7",
-    "surface": "#fcfdfd",
-    "sunken": "#e9edf1",
-    "line": "#d3dae1",
-    "line-strong": "#aeb9c4",
+    "page": "#f7f8f9",
+    "surface": "#ffffff",
+    "sunken": "#f0f2f4",
+    "active": "#e8ebee",
+    "line": "#e4e7eb",
+    "line-strong": "#cdd2d9",
     # text
-    "ink": "#111a22",
-    "ink-2": "#3d4a57",
-    "ink-3": "#586574",
-    # the one interface accent (links, focus ring, primary button); same hue as the housing series
+    "ink": "#0e1116",
+    "ink-2": "#3c4450",
+    "ink-3": "#5c6673",
+    # the one primary action is near-black; colour is kept for data
+    "primary": "#0e1116",
+    "primary-hover": "#2a303a",
+    "on-primary": "#ffffff",
+    # links and the focus ring
     "accent": "#0b5f96",
     "accent-strong": "#084a75",
     "accent-soft": "#e2edf5",
-    "on-accent": "#fcfdfd",
+    "on-accent": "#ffffff",
     # notices
     "caution-ink": "#7a4300",
     "caution-soft": "#fdf1e2",
@@ -42,11 +45,11 @@ COLOR = {
     "housing": "#0072B2",
     "preservation": "#009E73",
     "crash": "#D55E00",
+    "crash-ink": "#b34e00",       # the crash hue at text contrast (4.5:1 on white)
     "comparison": "#6b7783",
     # the not-yet-completed line of the event study: a dark neutral, because a mid grey sits too close
-    # to the blue and the green it is drawn with (the dataviz validator's separation checks pass for
-    # all three pairs; it is darker than the categorical band on purpose, being a reference line)
-    "reference": "#3d4a57",
+    # to the blue and the green it is drawn with
+    "reference": "#3c4450",
     "placebo": "#B26F00",
 }
 BOROUGH_COLOR = {"Bronx": "#E69F00", "Brooklyn": "#0072B2", "Manhattan": "#D55E00",
@@ -62,14 +65,14 @@ SEQUENTIAL = [[0.0, "#fdf0e6"], [0.2, "#fbd3b5"], [0.4, "#f5ac7a"], [0.6, "#e984
 
 SPACE = {"1": "0.25rem", "2": "0.5rem", "3": "0.75rem", "4": "1rem", "5": "1.5rem", "6": "2rem",
          "7": "3rem", "8": "4.5rem"}
-# One type scale, ratio about 1.2 below the headings and wider above them.
-TYPE = {"xs": "0.8125rem", "sm": "0.875rem", "base": "1rem", "md": "1.125rem", "lg": "1.375rem",
-        "xl": "1.75rem", "2xl": "2.375rem", "3xl": "3.25rem", "4xl": "4rem"}
+# One type scale for a working screen: titles near 26px, figures up to 56px.
+TYPE = {"xs": "0.75rem", "sm": "0.875rem", "base": "0.9375rem", "md": "1.0625rem", "lg": "1.25rem",
+        "xl": "1.625rem", "2xl": "2.125rem", "3xl": "2.75rem", "4xl": "3.5rem"}
 RADIUS = "8px"
-SHADOW = "0 10px 28px rgb(17 26 34 / 0.14)"      # open dropdown menus
-SHADOW_RAISED = "0 1px 2px rgb(17 26 34 / 0.2), 0 6px 16px rgb(11 95 150 / 0.24)"   # the primary button only
+SHADOW = "0 8px 24px rgb(14 17 22 / 0.12)"      # things that truly float: menus, dialogs
+SHADOW_RAISED = SHADOW
 # Motion: one easing curve (a fast start that settles) and three durations. Interface feedback stays
-# under 250 ms; site.css switches all of it off under prefers-reduced-motion.
+# under 250 ms; assets/css/00-base.css switches all of it off under prefers-reduced-motion.
 EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)"
 DURATION = {"fast": "120ms", "base": "200ms", "slow": "360ms"}
 CHART_FONT_SIZE = 13
@@ -111,7 +114,7 @@ def plotly_template() -> go.layout.Template:
                        "font": {"family": FONT_STACK, "size": CHART_FONT_SIZE, "color": COLOR["ink"]}},
         "annotationdefaults": {"font": {"size": CHART_TICK_SIZE, "color": COLOR["ink-3"]}},
         # the toolbar is quiet until it is used, and still passes 3:1 against the chart surface
-        "modebar": {"bgcolor": "rgba(252,253,253,0.9)", "color": COLOR["ink-3"], "activecolor": COLOR["accent"],
+        "modebar": {"bgcolor": "rgba(255,255,255,0.9)", "color": COLOR["ink-3"], "activecolor": COLOR["accent"],
                     "remove": MODEBAR_REMOVE},
         "separators": ".,",
         "hovermode": "closest",

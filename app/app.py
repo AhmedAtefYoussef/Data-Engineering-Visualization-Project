@@ -17,10 +17,9 @@ import os
 import dash
 from flask import Response, request
 
-from app import data
-from app.callbacks import register
+from app import data, shell
 from app.filters import YEAR_END, YEAR_START
-from app.layout import build_layout, missing_data_layout
+from app.layout import missing_data_layout
 from app.report import GEOJSON_URL
 from app.theme import COLOR, FONTS_URL, css_variables
 
@@ -73,7 +72,7 @@ def add_security_headers(response: Response) -> Response:
         response.headers.setdefault(name, value)
     return response
 
-# The design tokens are written into the head as CSS variables; app/assets/site.css uses only them.
+# The design tokens are written into the head as CSS variables; the files in app/assets/css use only them.
 app.index_string = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -143,8 +142,9 @@ except FileNotFoundError as error:
     log.warning("%s", error)
     app.layout = missing_data_layout(str(error))
 else:
-    app.layout = build_layout(STORE)
-    register(app, STORE)
+    app.layout = shell.build_shell(STORE)
+    app.validation_layout = shell.validation_layout(STORE)
+    shell.register(app, STORE)
     server.add_url_rule(GEOJSON_URL, "crash_grid", _serve_grid(STORE))
     log.info("data loaded: %s crashes, %s housing rows, built %s",
              f"{STORE.meta['rows']['crashes']:,}", f"{STORE.meta['rows']['housing']:,}", STORE.meta["built_at"])

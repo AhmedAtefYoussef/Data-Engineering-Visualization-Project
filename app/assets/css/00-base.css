@@ -1,0 +1,45 @@
+/* Base: every colour, size, space, radius, easing and duration comes from the tokens that app/theme.py writes
+   into the page head. Files load in name order: base, shell, components, dropdown, then one file per view. */
+
+@font-face { font-family: "Hanken Grotesk Fallback"; src: local("Arial"), local("Helvetica Neue"), local("Liberation Sans"); size-adjust: 100%; ascent-override: 96%; descent-override: 26%; line-gap-override: 0%; }
+@font-face { font-family: "Schibsted Grotesk Fallback"; src: local("Arial"), local("Helvetica Neue"), local("Liberation Sans"); size-adjust: 100%; ascent-override: 96%; descent-override: 26%; line-gap-override: 0%; }
+
+*, *::before, *::after { box-sizing: border-box; }
+:root { accent-color: var(--color-accent); scrollbar-color: var(--color-line-strong) transparent; scrollbar-width: thin; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: var(--space-5); }
+body {
+  margin: 0; background: var(--color-page); color: var(--color-ink);
+  font: 400 var(--text-base)/1.55 var(--font); font-variant-numeric: tabular-nums lining-nums; caret-color: var(--color-accent);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+::selection { background: var(--color-accent-soft); color: var(--color-ink); }
+h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; }
+h1 { font-size: var(--text-xl); font-weight: 600; line-height: 1.15; letter-spacing: -0.02em; }
+h2 { font-size: var(--text-md); font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; }
+h3 { font-size: var(--text-base); font-weight: 600; line-height: 1.35; letter-spacing: -0.005em; }
+p { text-wrap: pretty; }
+a { color: var(--color-accent); text-decoration-thickness: 1px; text-underline-offset: 0.2em; transition: color var(--duration-fast) ease-out; }
+a:hover { color: var(--color-accent-strong); }
+q { quotes: "\201C" "\201D"; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 2px; }
+main:focus { outline: none; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.skip-link {
+  position: absolute; left: var(--space-4); top: -5rem; z-index: 40; padding: var(--space-3) var(--space-4);
+  background: var(--color-primary); color: var(--color-on-primary); border-radius: var(--radius); font-weight: 600;
+}
+.skip-link:focus { top: var(--space-2); color: var(--color-on-primary); }
+
+@keyframes progress { from { transform: scaleX(0); } 35% { transform: scaleX(0.6); } to { transform: scaleX(0.92); } }
+@keyframes turn { to { transform: rotate(1turn); } }
+@keyframes arrive { from { opacity: 0; transform: translateY(4px); } }
+@keyframes settle { from { opacity: 0.25; transform: translateY(6px); } }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* Reduced motion: states stay, travel goes. Each view file relies on this rule, so none repeats it. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .button:active { transform: none; }
+}
