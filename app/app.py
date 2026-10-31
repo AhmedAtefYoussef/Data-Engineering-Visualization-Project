@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import functools
 import gzip
+import hashlib
 import json
 import logging
 import os
@@ -27,7 +28,32 @@ TITLE = "Affordable housing and injury crashes in NYC"
 DESCRIPTION = ("An interactive report on affordable-housing buildings and police crash reports in "
                f"New York City, {YEAR_START} to {YEAR_END}.")
 DEFAULT_PORT = 8050
-GEOJSON_MAX_AGE_S = 86_400
+GEOJSON_MAX_AGE_S = 31_536_000      # only for the versioned URL; the bare URL is revalidated every time
+
+# One policy for every response. 'unsafe-inline' scripts and styles are needed because Dash writes its
+# config and renderer into the page; MapLibre (inside Plotly) starts its tile workers from blob: URLs and
+# reads the CARTO style, tiles, sprites and glyphs; the fonts come from Google Fonts.
+CARTO = "https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com"
+CONTENT_SECURITY_POLICY = "; ".join([
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    f"img-src 'self' data: blob: {CARTO}",
+    f"connect-src 'self' {CARTO}",
+    "worker-src 'self' blob:",
+    "child-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+])
+SECURITY_HEADERS = {
+    "Content-Security-Policy": CONTENT_SECURITY_POLICY,
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+}
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("site")
@@ -38,6 +64,14 @@ app = dash.Dash(
                {"name": "description", "content": DESCRIPTION},
                {"name": "color-scheme", "content": "light"}])
 server = app.server
+
+
+@server.after_request
+def add_security_headers(response: Response) -> Response:
+    """Set the security headers on every response (pages, assets, callbacks and the grid)."""
+    for name, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    return response
 
 # The design tokens are written into the head as CSS variables; app/assets/site.css uses only them.
 app.index_string = """<!DOCTYPE html>
@@ -61,24 +95,44 @@ app.index_string = """<!DOCTYPE html>
 </html>"""
 
 
+_grid_source: list = []        # holds the grid builder once the data is loaded
+
+
+def grid_url() -> str:
+    """The one place callers get the map grid's URL: it carries a hash of the content, so a rebuilt grid
+    is never read from an old cache. Without data it is the bare route."""
+    if not _grid_source:
+        return GEOJSON_URL
+    return f"{GEOJSON_URL}?v={_grid_source[0]()[2]}"
+
+
 def _serve_grid(store):
-    """A view that serves the map grid, gzip-compressed, cacheable for a day. Built on first use."""
+    """A view that serves the map grid, gzip-compressed. Built on first use.
+
+    The bare URL is revalidated on every load (ETag), so it can never paint counts on stale cells;
+    the same URL with `?v=<hash>` is immutable for a year because the hash names the content.
+    """
 
     @functools.cache
-    def encoded() -> tuple[bytes, bytes]:
+    def encoded() -> tuple[bytes, bytes, str]:
         payload = json.dumps(data.grid_geojson(store), separators=(",", ":")).encode("utf-8")
-        return payload, gzip.compress(payload, compresslevel=6)
+        digest = hashlib.sha256(payload).hexdigest()[:12]
+        return payload, gzip.compress(payload, compresslevel=6), digest
 
     def crash_grid() -> Response:
-        payload, compressed = encoded()
+        payload, compressed, digest = encoded()
         accepts_gzip = "gzip" in request.headers.get("Accept-Encoding", "")
         response = Response(compressed if accepts_gzip else payload, mimetype="application/geo+json")
         if accepts_gzip:
             response.headers["Content-Encoding"] = "gzip"
-        response.headers["Cache-Control"] = f"public, max-age={GEOJSON_MAX_AGE_S}"
+        immutable = request.args.get("v") == digest
+        response.headers["Cache-Control"] = (f"public, max-age={GEOJSON_MAX_AGE_S}, immutable" if immutable
+                                             else "no-cache")
         response.headers["Vary"] = "Accept-Encoding"
-        return response
+        response.set_etag(digest)
+        return response.make_conditional(request)
 
+    _grid_source[:] = [encoded]
     return crash_grid
 
 
