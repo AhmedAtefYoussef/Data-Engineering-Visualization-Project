@@ -297,7 +297,7 @@ def test_page_and_grid_are_served(client):
     page = client.get("/")
     assert page.status_code == 200 and b"design-tokens" in page.data
     layout = client.get("/_dash-layout").get_data(as_text=True)
-    assert "page-content" in layout and "Explore" in layout   # the views themselves are routed: tests/test_routes.py
+    assert "Generate report" in layout and "Do injury crashes rise" in layout
     grid = client.get("/data/crash-grid.geojson", headers={"Accept-Encoding": "gzip"})
     assert grid.status_code == 200 and grid.headers["Content-Encoding"] == "gzip"
 

@@ -1,45 +1,42 @@
 /* Base: every colour, size, space, radius, easing and duration comes from the tokens that app/theme.py writes
-   into the page head. Files load in name order: base, shell, components, dropdown, then one file per view. */
+   into the page head. Files load in name order: base, page, components, dropdown, then one file per part. */
 
 @font-face { font-family: "Hanken Grotesk Fallback"; src: local("Arial"), local("Helvetica Neue"), local("Liberation Sans"); size-adjust: 100%; ascent-override: 96%; descent-override: 26%; line-gap-override: 0%; }
-@font-face { font-family: "Schibsted Grotesk Fallback"; src: local("Arial"), local("Helvetica Neue"), local("Liberation Sans"); size-adjust: 100%; ascent-override: 96%; descent-override: 26%; line-gap-override: 0%; }
+@font-face { font-family: "Bodoni Moda Fallback"; src: local("Georgia"), local("Times New Roman"); size-adjust: 96%; ascent-override: 90%; descent-override: 24%; line-gap-override: 0%; }
 
 *, *::before, *::after { box-sizing: border-box; }
-:root { accent-color: var(--color-accent); scrollbar-color: var(--color-line-strong) transparent; scrollbar-width: thin; }
-html { -webkit-text-size-adjust: 100%; scroll-padding-top: var(--space-5); }
+:root { accent-color: var(--color-primary); scrollbar-color: var(--color-line-strong) transparent; scrollbar-width: thin; --gutter: clamp(1.25rem, 5vw, 5.5rem); --tint: var(--color-page); }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; scroll-padding-top: 5rem; background: var(--color-page); }
 body {
-  margin: 0; background: var(--color-page); color: var(--color-ink);
-  font: 400 var(--text-base)/1.55 var(--font); font-variant-numeric: tabular-nums lining-nums; caret-color: var(--color-accent);
-  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  margin: 0; background: var(--tint); color: var(--color-ink); transition: background-color var(--duration-epic) var(--ease-out);
+  font: 400 var(--text-base)/1.6 var(--font); font-variant-numeric: lining-nums; caret-color: var(--color-primary);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; overflow-x: clip;
 }
-::selection { background: var(--color-accent-soft); color: var(--color-ink); }
+::selection { background: var(--color-primary); color: var(--color-on-primary); }
 h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; }
 ul, ol { padding: 0; list-style: none; }
-h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; }
-h1 { font-size: var(--text-xl); font-weight: 600; line-height: 1.15; letter-spacing: -0.02em; }
-h2 { font-size: var(--text-md); font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; }
-h3 { font-size: var(--text-base); font-weight: 600; line-height: 1.35; letter-spacing: -0.005em; }
+h1, h2 { font-family: var(--font-display); font-weight: 500; font-optical-sizing: auto; text-wrap: balance; }
+h1 { font-size: clamp(2.5rem, min(1.2rem + 4.4vw, 8.4vh), var(--text-4xl)); line-height: 1.02; letter-spacing: -0.02em; }
+h2 { font-size: clamp(2.25rem, 1.4rem + 3.2vw, var(--text-3xl)); line-height: 1.05; letter-spacing: -0.015em; }
+h3 { font-size: var(--text-md); font-weight: 600; line-height: 1.3; letter-spacing: -0.005em; text-wrap: balance; }
 p { text-wrap: pretty; }
 a { color: var(--color-accent); text-decoration-thickness: 1px; text-underline-offset: 0.2em; transition: color var(--duration-fast) ease-out; }
 a:hover { color: var(--color-accent-strong); }
 q { quotes: "\201C" "\201D"; }
-:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 2px; }
-main:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 4px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.skip-link {
-  position: absolute; left: var(--space-4); top: -5rem; z-index: 40; padding: var(--space-3) var(--space-4);
-  background: var(--color-primary); color: var(--color-on-primary); border-radius: var(--radius); font-weight: 600;
-}
+.skip-link { position: absolute; left: var(--space-4); top: -6rem; z-index: 60; padding: var(--space-3) var(--space-4); background: var(--color-primary); color: var(--color-on-primary); border-radius: var(--radius); font-weight: 600; }
 .skip-link:focus { top: var(--space-2); color: var(--color-on-primary); }
 
 @keyframes progress { from { transform: scaleX(0); } 35% { transform: scaleX(0.6); } to { transform: scaleX(0.92); } }
 @keyframes turn { to { transform: rotate(1turn); } }
-@keyframes arrive { from { opacity: 0; transform: translateY(4px); } }
-@keyframes settle { from { opacity: 0.25; transform: translateY(6px); } }
+@keyframes arrive { from { opacity: 0; transform: translateY(6px); } }
+@keyframes settle { from { opacity: 0; transform: translateY(18px); } }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 
-/* Reduced motion: states stay, travel goes. Each view file relies on this rule, so none repeats it. */
+/* Reduced motion: states stay, travel goes. Every part of the page relies on this rule. */
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .button:active { transform: none; }
 }

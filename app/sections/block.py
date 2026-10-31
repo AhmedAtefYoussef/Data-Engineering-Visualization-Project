@@ -7,8 +7,8 @@ from app import components
 from app.data import Store
 
 
-def layout(store: Store) -> html.Div:
-    return components.view([components.page_header("Your block", "Find a building or a ZIP code.")])
+def layout(store: Store) -> html.Section:
+    return components.section("block", "Your block", "Find a building or a ZIP code and see how its streets compare.", [], "harbor")
 
 
 def register(app: Dash, store: Store) -> None:

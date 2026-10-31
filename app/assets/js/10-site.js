@@ -10,11 +10,7 @@
       charts get dragmode: false, which lets the drag scroll the page (tapping a mark still
       shows its values). The map keeps its gestures, because a map is expected to pan and pinch.
 
-   Both are re-applied after every re-render through one throttled MutationObserver.
-
-   3. A new report. When #report stops loading, <body> carries data-report="fresh" for a moment;
-      assets/css/30-explore.css uses it to settle the four headline numbers into place. Nothing is set when the
-      reader asks for reduced motion. */
+   Both are re-applied after every re-render through one throttled MutationObserver. */
 (function () {
   "use strict";
 
@@ -40,34 +36,11 @@
     });
   }
 
-  var FRESH_MS = 700;                 // longer than the longest settle animation plus its delay
-  var LOADING_CLASS = "is-loading";
-  var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var watchedReport = null;
-  var freshTimer = 0;
-
-  function watchReport() {
-    var report = document.getElementById("report");
-    if (!report || report === watchedReport) { return; }
-    watchedReport = report;
-    var wasLoading = report.classList.contains(LOADING_CLASS);
-    new MutationObserver(function () {
-      var isLoading = report.classList.contains(LOADING_CLASS);
-      if (wasLoading && !isLoading && !reducedMotion.matches) {
-        document.body.setAttribute("data-report", "fresh");
-        window.clearTimeout(freshTimer);
-        freshTimer = window.setTimeout(function () { document.body.removeAttribute("data-report"); }, FRESH_MS);
-      }
-      wasLoading = isLoading;
-    }).observe(report, { attributes: true, attributeFilter: ["class"] });
-  }
-
-  var scheduled = false;
+    var scheduled = false;
   function refresh() {
     scheduled = false;
     nameComboboxes();
     freeTouchScroll();
-    watchReport();
   }
 
   function start() {

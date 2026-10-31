@@ -3,12 +3,12 @@ from __future__ import annotations
 
 from dash import Dash, html
 
-from app import components, story
+from app import story
 from app.data import Store
 
 
-def layout(store: Store) -> html.Div:
-    return components.view([story.findings(store)], "view-findings")
+def layout(store: Store) -> html.Section:
+    return story.findings(store)
 
 
 def register(app: Dash, store: Store) -> None:

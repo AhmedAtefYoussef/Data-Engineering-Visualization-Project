@@ -17,7 +17,7 @@ import os
 import dash
 from flask import Response, request
 
-from app import data, shell
+from app import data, page
 from app.filters import YEAR_END, YEAR_START
 from app.layout import missing_data_layout
 from app.report import GEOJSON_URL
@@ -61,7 +61,7 @@ app = dash.Dash(
     __name__, title=TITLE, update_title=None, suppress_callback_exceptions=False,
     meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"},
                {"name": "description", "content": DESCRIPTION},
-               {"name": "color-scheme", "content": "light"}])
+               {"name": "color-scheme", "content": "dark"}])
 server = app.server
 
 
@@ -80,7 +80,7 @@ app.index_string = """<!DOCTYPE html>
 <title>{%title%}</title>
 {%favicon%}
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-<meta name="theme-color" content='""" + COLOR["surface"] + """'>
+<meta name="theme-color" content='""" + COLOR["page"] + """'>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href='""" + FONTS_URL + """'>
@@ -142,9 +142,8 @@ except FileNotFoundError as error:
     log.warning("%s", error)
     app.layout = missing_data_layout(str(error))
 else:
-    app.layout = shell.build_shell(STORE)
-    app.validation_layout = shell.validation_layout(STORE)
-    shell.register(app, STORE)
+    app.layout = page.build_page(STORE)
+    page.register(app, STORE)
     server.add_url_rule(GEOJSON_URL, "crash_grid", _serve_grid(STORE))
     log.info("data loaded: %s crashes, %s housing rows, built %s",
              f"{STORE.meta['rows']['crashes']:,}", f"{STORE.meta['rows']['housing']:,}", STORE.meta["built_at"])
