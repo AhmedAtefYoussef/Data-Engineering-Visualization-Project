@@ -234,7 +234,7 @@ def event_figure(study: dict) -> go.Figure:
             mode="lines", fill="toself", fillcolor=_rgba(color, BAND_OPACITY), line={"width": 0},
             hoverinfo="skip", showlegend=False))
         figure.add_trace(go.Scatter(
-            x=rel_years, y=profile["index"], name=f"{name} (n = {profile['n_sites']:,})",
+            x=rel_years, y=profile["index"], name=f"{name} (n = {profile['n_sites']:,} sites)",
             mode="lines+markers", line={"color": color, "width": 2, "dash": dash},
             marker={"symbol": symbol, "size": 8, "color": color, "line": {"color": COLOR["surface"], "width": 1}},
             customdata=np.column_stack([profile["low"], profile["high"]]),
@@ -334,10 +334,13 @@ def robustness_figure(table: pd.DataFrame) -> go.Figure:
             error_x={"type": "data", "symmetric": False, "array": clipped_high - estimate,
                      "arrayminus": estimate - clipped_low, "color": color, "thickness": 1.5, "width": 0},
             customdata=np.column_stack([rows["percent_change"], rows["percent_low"], rows["percent_high"],
-                                        rows["n_treated"], rows["n_comparison"]]),
+                                        rows["n_treated"], rows["n_comparison_sites"], rows["n_comparison"],
+                                        rows["n_treated_clusters"], rows["n_resampled_units"]]),
             hovertemplate=("%{y}<br>%{customdata[0]:+.1f}% (95% interval %{customdata[1]:+.1f} to "
                            "%{customdata[2]:+.1f})<br>%{customdata[3]:,} completed sites and "
-                           "%{customdata[4]:,} comparison sites<extra></extra>")))
+                           "%{customdata[4]:,} comparison sites (%{customdata[5]:,} comparison rows)<br>"
+                           "%{customdata[6]:,} of %{customdata[7]:,} resampled clusters hold a completed site"
+                           "<extra></extra>")))
     beyond = table[table["percent_high"] > FOREST_LIMIT]
     for position, row in beyond.iterrows():
         figure.add_annotation(x=FOREST_LIMIT, y=labels[position], xanchor="right", yanchor="bottom",

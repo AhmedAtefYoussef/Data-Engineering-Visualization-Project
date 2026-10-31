@@ -342,7 +342,8 @@ def event_study(store: Store, filters: Filters) -> dict:
     """Crashes within the buffer of sites by year relative to completion, completed against not-yet-completed.
 
     Uses the borough, construction-type, size and who-was-harmed filters. Cached, because each
-    call runs up to four bootstraps.
+    call runs up to four bootstraps. `n_comparison` counts rows (a comparison site has one per cohort it
+    serves) and `n_comparison_sites` counts sites; a group needs MIN_GROUP_N unique sites to be estimated.
     """
     return _event_study(store, filters.boroughs, filters.construction, filters.sizes, event_outcome(filters))
 
@@ -367,18 +368,27 @@ def _event_study(store: Store, boroughs: tuple, construction: tuple, sizes: tupl
     before = counts[:, :len(PRE_YEARS)].sum(axis=1)
     after = counts[:, -len(POST_YEARS):].sum(axis=1)
     cohorts, clusters = sample["cohort"].to_numpy(), sample["cluster_id"].to_numpy()
+    site_ids = sample["site_id"].to_numpy()
     n_by_type = {name: int((treated & (kind == name)).sum()) for name in wanted_types}
-    n_comparison = int((~treated).sum())
-    result = {"outcome": outcome, "noun": EVENT_OUTCOME_NOUN[outcome], "rel_years": REL_YEARS,
-              "n_by_type": n_by_type, "n_comparison": n_comparison, "treated": {}, "difference": None}
-
-    usable = [name for name in wanted_types if n_by_type[name] >= MIN_GROUP_N]
-    if not usable or n_comparison < MIN_GROUP_N:
-        result["empty"] = True
-        return result
 
     def rows_for(name):
         return ~treated | (kind == name)
+
+    # Counted on what each estimate uses: a cohort with sites on one side only is left out of it.
+    sizes = {name: stats.used_sizes(site_ids[rows_for(name)], treated[rows_for(name)], cohorts[rows_for(name)],
+                                    clusters[rows_for(name)]) for name in wanted_types}
+    result = {"outcome": outcome, "noun": EVENT_OUTCOME_NOUN[outcome], "rel_years": REL_YEARS,
+              "n_by_type": n_by_type, "n_comparison": int((~treated).sum()),
+              "n_comparison_sites": int(pd.unique(site_ids[~treated]).size),
+              "n_clusters": int(pd.unique(clusters).size),
+              "n_treated_clusters": int(pd.unique(clusters[treated]).size),
+              "treated": {}, "difference": None}
+
+    usable = [name for name in wanted_types
+              if min(sizes[name]["n_treated_sites"], sizes[name]["n_comparison_sites"]) >= MIN_GROUP_N]
+    if not usable:
+        result["empty"] = True
+        return result
 
     if len(usable) == 2:
         # Both types against the shared comparison sites in one joint bootstrap (the notebook's RQ5).
@@ -392,13 +402,14 @@ def _event_study(store: Store, boroughs: tuple, construction: tuple, sizes: tupl
                                                     cohorts[rows], clusters[rows])}
     for name in usable:
         rows = rows_for(name)
-        profile = stats.event_profile(counts[rows], treated[rows], cohorts[rows], clusters[rows], len(PRE_YEARS))
+        profile = stats.event_profile(counts[rows], treated[rows], cohorts[rows], clusters[rows], len(PRE_YEARS),
+                                      site_ids=site_ids[rows])
         result["treated"][name] = {"profile": profile["treated"], "did": estimates[name]}
         if len(usable) == 1:
             result["comparison"] = profile["comparison"]
     if len(usable) == 2:
         # One comparison line for the chart, weighted by the cohort mix of all treated sites shown.
-        pooled = stats.event_profile(counts, treated, cohorts, clusters, len(PRE_YEARS))
+        pooled = stats.event_profile(counts, treated, cohorts, clusters, len(PRE_YEARS), site_ids=site_ids)
         result["comparison"] = pooled["comparison"]
     return result
 
@@ -408,7 +419,8 @@ def site_selection(store: Store, filters: Filters) -> dict:
 
     Uses the borough, construction-type and size filters. Sites are the ones started after the
     baseline (see meta.json); the year filter does not apply. The bootstrap resamples site clusters
-    (`cluster_id`, sites linked within the buffer), as the notebook does.
+    (`cluster_id`, sites linked within the buffer), as the notebook does. `one_vote` repeats the mean
+    with each cluster counted once; it is NaN below MIN_GROUP_N clusters.
     """
     return _site_selection(store, filters.boroughs, filters.construction, filters.sizes)
 
@@ -430,12 +442,14 @@ def _site_selection(store: Store, boroughs: tuple, construction: tuple, sizes: t
         return result
     percentiles = sites["borough_percentile"].to_numpy(dtype=float)
     boot = stats.bootstrap_ci(stats.mean_percentile_excess, percentiles, clusters=sites["cluster_id"].to_numpy())
+    one_vote = stats.one_vote_per_cluster(percentiles, sites["cluster_id"].to_numpy(), min_clusters=MIN_GROUP_N)
     n_bins = 100 // PERCENTILE_BIN_WIDTH
     bins = np.clip((percentiles // PERCENTILE_BIN_WIDTH).astype(int), 0, n_bins - 1)
     result.update({
         "excess": boot["estimate"], "low": boot["low"], "high": boot["high"],
         "mean_percentile": stats.NEUTRAL_PERCENTILE + boot["estimate"],
         "share_above_median": float((percentiles > stats.NEUTRAL_PERCENTILE).mean() * 100),
+        "one_vote": one_vote,
         "n_blocks": boot["n_clusters"],
         "cluster_unit": "site clusters (sites within the buffer of each other)",
         "bin_share": np.bincount(bins, minlength=n_bins) / len(percentiles) * 100,

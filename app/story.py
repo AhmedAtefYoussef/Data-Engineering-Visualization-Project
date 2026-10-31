@@ -13,9 +13,9 @@ from dash import dcc, html
 from app import charts
 from app.data import Store
 from app.filters import YEAR_END, YEAR_START, buffer_m
-from app.stats import NEUTRAL_PERCENTILE
+from app.stats import NEUTRAL_PERCENTILE, level_text
 from app.story_text import (SAME_AS_ZERO, finding_extras, findings_lead, interval_level_text, interval_text,
-                            number_word, reading_label, robustness_text, signed, unit_digits, zip_level_text)
+                            number_word, ordinal, reading_label, robustness_text, signed, unit_digits, zip_level_text)
 from app.theme import GRAPH_CONFIG
 
 
@@ -33,6 +33,7 @@ def hero(store: Store) -> html.Section:
     rows, questions = store.meta["rows"], store.results["questions"]
     after, where = questions["RQ3"], questions["RQ7"]
     baseline = store.meta["constants"]["baseline_years"]
+    one_vote = store.results["detail"]["rq7"]["one_vote"]
     return html.Section(className="hero", children=[
         html.P(f"New York City, {YEAR_START} to {YEAR_END}", className="eyebrow"),
         html.H1("Do injury crashes rise around affordable housing once it opens?"),
@@ -59,7 +60,11 @@ def hero(store: Store) -> html.Section:
                        f"crashes in {baseline[0]} to {baseline[1]}, before the project started, the average site sits "
                        f"at the {NEUTRAL_PERCENTILE + where['estimate']:.0f}th percentile. A typical street point is "
                        f"at the {NEUTRAL_PERCENTILE}th (95% interval {NEUTRAL_PERCENTILE + where['low']:.0f} to "
-                       f"{NEUTRAL_PERCENTILE + where['high']:.0f}, {where['n']:,} sites)."),
+                       f"{NEUTRAL_PERCENTILE + where['high']:.0f}, {where['n']:,} sites). Citywide the direction holds and the "
+                       f"size depends on the weighting: counting each cluster of linked sites once gives the "
+                       f"{ordinal(NEUTRAL_PERCENTILE + one_vote['estimate'])} percentile "
+                       f"({NEUTRAL_PERCENTILE + one_vote['low']:.0f} to {NEUTRAL_PERCENTILE + one_vote['high']:.0f}, "
+                       f"{one_vote['n']:,} clusters)."),
             ]),
         ]),
     ])
@@ -100,7 +105,7 @@ def _finding_row(key: str, item: dict, extra: str | None) -> html.Li:
             html.P([html.Span(signed(item["estimate"], digits), className="finding-estimate"),
                     html.Span(item["unit"], className="finding-unit")]),
             _interval_mark(item["low"], item["estimate"], item["high"]),
-            html.P(f"{item['level']:.0%} interval {interval_text(item, digits)}", className="finding-range"),
+            html.P(f"{level_text(item['level'])} interval {interval_text(item, digits)}", className="finding-range"),
             html.P(f"n = {item['n']:,} {item['n_unit']}", className="finding-range"),
             html.P(reading, className=reading_class),
         ]),
@@ -205,8 +210,9 @@ def impact(store: Store) -> html.Section:
     items = [
         ("Department of Transportation and Vision Zero",
          f"The housing table gives each building's start date as well as its completion date, and "
-         f"{new_sites['share_above_borough_median_pct']:.0f}% of the new-construction sites stood above the "
-         f"median street point of their borough for injury crashes before work began (a median of "
+         f"{new_sites['share_above_borough_median_pct']:.0f}% of the new-construction sites "
+         f"({new_sites['share_clusters_above_borough_median_pct']:.0f}% of their clusters of linked sites) stood above "
+         f"the median street point of their borough for injury crashes before work began (a median of "
          f"{new_sites['median_baseline_crashes']:.0f} within {buffer_m()} m over three years, against "
          f"{new_sites['median_baseline_crashes_reference']:.0f} at the median street point). That record is "
          "available when a project starts, so street redesign could be timed to finish before tenants arrive. "
@@ -222,7 +228,8 @@ def impact(store: Store) -> html.Section:
          "after windows more exact."),
         ("Community boards",
          f"Before a proposed new building opens, {new_sites['share_above_borough_median_pct']:.0f}% of "
-         "new-construction sites stood on streets above their borough's median for injury crashes. A board can "
+         f"new-construction sites, and {new_sites['share_clusters_above_borough_median_pct']:.0f}% of their clusters, "
+         "stood on streets above their borough's median for injury crashes. A board can "
          "ask for street improvements on the strength of that record, without making the request depend on the "
          "building. These results say nothing about a single corner."),
         ("Residents",
@@ -301,8 +308,9 @@ def data_and_method(store: Store) -> html.Section:
                  **{"aria-label": "Chart of the main result under each change of method"}),
         html.P("Change in injury crashes around new buildings after completion, compared with the same change at "
                f"not-yet-completed sites, in percent. The bars are 95% intervals from {constants['n_boot']:,} "
-               "resamples of whole clusters of nearby sites. The Outcome row counts all crashes. Hover a row for "
-               "its sample.", className="chart-note"),
+               "resamples of whole clusters of nearby sites. The Outcome row counts all crashes. The comparison "
+               "subset rows are unadjusted cuts. Hover a row for its sites, comparison rows and clusters.",
+               className="chart-note"),
     ])
 
 

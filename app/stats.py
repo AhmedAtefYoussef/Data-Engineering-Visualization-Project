@@ -11,14 +11,21 @@ import warnings
 import numpy as np
 import pandas as pd
 
-N_BOOT = 1000                 # bootstrap resamples behind every interval (equal to Section 1's value)
+# BEGIN SHARED CONSTANTS: the one definition. tools/assemble_notebook.py pastes this block into Section 1.
+N_BOOT = 1000                 # bootstrap resamples behind every interval
 CI_LEVEL = 0.95
-SEED = 42
+SEED = 42                     # one seed, so every random step is repeatable
+# END SHARED CONSTANTS
 LOG_RATIO_OFFSET = 0.5        # crashes added to both counts, so a site with zero crashes keeps a finite ratio
 MAX_FAILED_SHARE = 0.10       # no interval is reported when more replicates than this share fail
 PERCENT = 100
 PRE_PERIOD_INDEX = 100        # the mean of the pre-completion years is set to 100 in the event chart
 NEUTRAL_PERCENTILE = 50       # mean percentile that sites would have if they were typical streets
+
+
+def level_text(level: float) -> str:
+    """An interval level as it is printed everywhere: 95%, 98.75%, 99.44%."""
+    return f"{round(PERCENT * level, 2):g}%"
 
 
 def percentile_ci(samples, level: float = CI_LEVEL) -> dict:
@@ -161,12 +168,40 @@ def did_log_ratio(before, after, treated, strata=None, clusters=None, n_boot: in
             "n_clusters": boot["n_clusters"], "n_failed": boot["n_failed"]}
 
 
+def used_sizes(site_ids, treated, strata=None, clusters=None) -> dict:
+    """Rows, unique sites and clusters behind a comparison, leaving out strata that lack an arm.
+
+    A comparison site serves every cohort it qualifies for, so it has one row per cohort: rows and
+    sites are different counts, and only sites may be called sites. `n_clusters` counts every cluster
+    in the sample, which is what the bootstrap resamples; `n_treated_clusters` those that hold a used
+    treated row, the clusters that can move the treated mean.
+    """
+    site_ids, treated = np.asarray(site_ids), np.asarray(treated, dtype=bool)
+    if strata is None:
+        strata_codes, n_strata = np.zeros(len(site_ids), dtype=np.int64), 1
+    else:
+        strata_codes, strata_labels = pd.factorize(np.asarray(strata))
+        n_strata = len(strata_labels)
+    has_both = ((np.bincount(strata_codes[treated], minlength=n_strata) > 0)
+                & (np.bincount(strata_codes[~treated], minlength=n_strata) > 0))
+    used = has_both[strata_codes]
+    sizes = {"n_treated": int((used & treated).sum()), "n_control": int((used & ~treated).sum()),
+             "n_treated_sites": int(pd.unique(site_ids[used & treated]).size),
+             "n_comparison_sites": int(pd.unique(site_ids[used & ~treated]).size)}
+    if clusters is not None:
+        clusters = np.asarray(clusters)
+        sizes["n_clusters"] = int(pd.unique(clusters).size)
+        sizes["n_treated_clusters"] = int(pd.unique(clusters[used & treated]).size)
+    return sizes
+
+
 def type_contrast(before, after, arm, strata, clusters) -> dict:
     """DiD for two treated arms against one shared comparison arm, and their difference.
 
     arm: 0 = comparison, 1 and 2 = the two treated types. One joint bootstrap, so the shared
     comparison sites are the same in both estimates and the difference is paired. Returns three
-    dicts (`first`, `second`, `difference`) in percent.
+    dicts (`first`, `second`, `difference`) in percent; their counts are of the rows used, so a
+    stratum without comparison rows does not count as used.
     """
     change = log_ratio(before, after)
     arm = np.asarray(arm)
@@ -182,29 +217,42 @@ def type_contrast(before, after, arm, strata, clusters) -> dict:
         return np.array([by_type[0], by_type[1], by_type[0] - by_type[1]])
 
     boot = bootstrap_ci(type_estimates, change, arm, strata_codes, clusters=clusters)
-    counts = [int((arm == 1).sum()), int((arm == 2).sum())]
-    counts.append(sum(counts))
+    used = []
+    for treated_arm in (1, 2):
+        rows = (arm == 0) | (arm == treated_arm)
+        used.append(stratified_difference(change[rows], arm[rows] == treated_arm, strata_codes[rows], n_strata))
+    # The difference uses the comparison rows of every stratum that at least one treated type could use.
+    in_a_used_stratum = (np.bincount(strata_codes[arm != 0], minlength=n_strata) > 0)[strata_codes]
+    n_treated = [used[0]["n_treated"], used[1]["n_treated"], used[0]["n_treated"] + used[1]["n_treated"]]
+    n_control = [used[0]["n_control"], used[1]["n_control"], int(((arm == 0) & in_a_used_stratum).sum())]
+    n_all_treated = [int((arm == 1).sum()), int((arm == 2).sum()), int((arm != 0).sum())]
     names = ["first", "second", "difference"]
     return {name: {"percent_change": float(log_points_to_percent(boot["estimate"][position])),
                    "percent_low": float(log_points_to_percent(boot["low"][position])),
                    "percent_high": float(log_points_to_percent(boot["high"][position])),
-                   "p_value": float(boot["p_value"][position]), "n_treated": counts[position],
-                   "n_control": int((arm == 0).sum()), "n_clusters": boot["n_clusters"]}
+                   "p_value": float(boot["p_value"][position]), "n_treated": n_treated[position],
+                   "n_control": n_control[position],
+                   "n_treated_dropped": n_all_treated[position] - n_treated[position],
+                   "n_control_dropped": int((arm == 0).sum()) - n_control[position],
+                   "n_clusters": boot["n_clusters"]}
             for position, name in enumerate(names)}
 
 
-def event_profile(counts, treated, cohorts, clusters, n_pre: int) -> dict:
+def event_profile(counts, treated, cohorts, clusters, n_pre: int, site_ids=None) -> dict:
     """Mean crashes per site by relative year, indexed to the pre-completion mean, for both groups.
 
     counts: (rows, relative years). Both groups are averaged cohort by cohort and the cohorts are
     weighted by the treated counts, so the two lines describe the same mix of calendar years.
     Returns {"treated": {...}, "comparison": {...}}, each with `index`, `low`, `high` (arrays over
-    relative years) and `n_sites`.
+    relative years), `n_rows` and, given `site_ids`, `n_sites`. Each group is resampled on its own,
+    so the overlap of the two bands is not the comparison: the interval to read for the difference
+    is the joint one of `did_log_ratio`.
     """
     counts = np.asarray(counts, dtype=float)
     treated = np.asarray(treated, dtype=bool)
     cohort_codes, cohort_labels = pd.factorize(np.asarray(cohorts))
     clusters = np.asarray(clusters)
+    sites = None if site_ids is None else np.asarray(site_ids)
     n_cohorts = len(cohort_labels)
     cohort_weights = np.bincount(cohort_codes[treated], minlength=n_cohorts).astype(float)
 
@@ -229,13 +277,31 @@ def event_profile(counts, treated, cohorts, clusters, n_pre: int) -> dict:
         rows = treated == is_treated
         boot = bootstrap_ci(indexed_means, counts[rows], cohort_codes[rows], clusters=clusters[rows])
         profile[group] = {"index": boot["estimate"], "low": boot["low"], "high": boot["high"],
-                          "n_sites": int(rows.sum())}
+                          "n_rows": int(rows.sum()),
+                          "n_sites": None if sites is None else int(pd.unique(sites[rows]).size)}
     return profile
 
 
 def mean_percentile_excess(percentiles) -> float:
     """Mean percentile minus 50: zero when the places rank like typical streets."""
     return float(percentiles.mean() - NEUTRAL_PERCENTILE)
+
+
+def one_vote_per_cluster(percentiles, clusters, min_clusters: int = 0) -> dict:
+    """RQ7 with every cluster of linked sites counted once: the excess of the mean of cluster means.
+
+    A site-weighted mean answers "where is the average building", and three chained clusters hold
+    most of the buildings. This answers "where is the average place". Replicates draw clusters, each
+    a single value here. With fewer than `min_clusters` clusters no statistic is given (NaN).
+    """
+    means = pd.Series(np.asarray(percentiles, dtype=float)).groupby(np.asarray(clusters)).mean().to_numpy()
+    result = {"estimate": float("nan"), "low": float("nan"), "high": float("nan"), "n_clusters": int(means.size),
+              "share_above_pct": float("nan")}
+    if means.size >= max(min_clusters, 1):
+        boot = bootstrap_ci(mean_percentile_excess, means)
+        result.update(estimate=boot["estimate"], low=boot["low"], high=boot["high"],
+                      share_above_pct=float(PERCENT * (means > NEUTRAL_PERCENTILE).mean()))
+    return result
 
 
 def spearman_rho(first, second) -> float:

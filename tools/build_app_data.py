@@ -18,7 +18,7 @@ Exports (parquet with categorical and small-integer columns, plus two JSON files
     sites           located housing sites, with their pre-construction crash percentile (RQ7)
     event_sites     one row per clean site and cohort, yearly counts by relative year (RQ3, RQ5)
     city_year       citywide yearly totals and the 2019 = 100 indices
-    robustness      every specification of the notebook's Section 9 (central, checks, placebos)
+    robustness      every specification of the notebook's Section 9 (central, checks, comparison cuts, placebos)
     cleaning_log    every cleaning rule with the rows it touched
     results.json    the ten research-question results with their sentences, and the story facts
     meta.json       row counts, data-as-of dates, constants, build time, file sizes
@@ -285,7 +285,7 @@ def smallest_unsigned_frame(frame: pd.DataFrame) -> pd.DataFrame:
 # 5. Results and metadata
 # --------------------------------------------------------------------------------------------
 # Short keys for the rows of the notebook's RQ7 table (the notebook's row labels are sentences).
-RQ7_ROWS = {"new": "RQ7_NEW", "pooled": "RQ7_POOLED", "within_zip": "RQ7_WITHIN_ZIP"}
+RQ7_ROWS = {"new": "RQ7_NEW", "pooled": "RQ7_POOLED", "within_zip": "RQ7_WITHIN_ZIP", "one_vote": "RQ7_ONE_VOTE"}
 
 
 def estimate_row(row: pd.Series, estimate: str, low: str, high: str, **extra: str) -> dict:
@@ -312,7 +312,8 @@ def results_document(ns: dict) -> dict:
             "level": stored["level"], "adjusted_p": stored["adjusted_p"],
             "n": stored["n"], "owner": row["owner"], "label": row["label"], "unit": row["unit"],
             "n_unit": row["n_unit"], "direction": row["direction"],
-            "excludes_zero": row["excludes_zero"], "kept": row["kept"],
+            "excludes_zero": row["excludes_zero"], "excludes_zero_reported": row["excludes_zero_reported"],
+            "kept": row["kept"],
         }
     contrast = ns["rq5_contrast"]
     rq7_sites, rq7_estimates = ns["rq7_sites"], ns["rq7_estimates"]
@@ -320,15 +321,19 @@ def results_document(ns: dict) -> dict:
     by_type = rq7_sites.groupby("construction_type", observed=True)["borough_percentile"].mean()
     reported_ped, rq9_all = ns["reported_ped"], ns["rq9_result"].loc["ped_cyc_share_pct"]
     detail = {
-        "rq3_did": {key: ns["new_build_did"][key] for key in
-                    ["percent_change", "percent_low", "percent_high", "p_value", "n_treated", "n_control"]},
+        # n_control counts comparison rows, one per cohort a site serves; n_comparison_sites counts sites.
+        "rq3_did": {**{key: ns["new_build_did"][key] for key in
+                       ["percent_change", "percent_low", "percent_high", "p_value", "n_treated", "n_control",
+                        "n_clusters"]},
+                    **{key: ns["new_build_sizes"][key] for key in ["n_comparison_sites", "n_treated_clusters"]}},
         "rq3_pretrend": {key: ns["pretrend_did"][key] for key in
                          ["percent_change", "percent_low", "percent_high"]},
         "rq5_by_type": {name: {"percent": contrast.loc[name, "estimate_pct"],
                                "low": contrast.loc[name, "low_pct"], "high": contrast.loc[name, "high_pct"],
                                "n": contrast.loc[name, "n_treated"]} for name in contrast.index},
         "rq7": {short: {**estimate_row(rq7_estimates.loc[ns[constant]], "estimate", "low", "high"),
-                        "n": int(rq7_estimates.loc[ns[constant], "n_sites"]),
+                        # One vote per cluster: n is the clusters, the units that were averaged.
+                        "n": int(rq7_estimates.loc[ns[constant], "units_resampled" if short == "one_vote" else "n_sites"]),
                         "units_resampled": int(rq7_estimates.loc[ns[constant], "units_resampled"])}
                 for short, constant in RQ7_ROWS.items()},
         "rq7_new_sites": {
@@ -337,6 +342,9 @@ def results_document(ns: dict) -> dict:
             "median_baseline_crashes": float(rq7_sites.loc[is_new, "baseline_crashes"].median()),
             "median_baseline_crashes_reference": float(ns["rq7_reference"]["baseline_crashes"].median()),
             "reference_points": len(ns["rq7_reference"]),
+            "share_clusters_above_borough_median_pct": ns["rq7_one_vote"]["share_above_pct"],
+            "largest_clusters_shown": ns["LARGEST_RQ7_CLUSTERS"],
+            "largest_clusters_share_pct": ns["rq7_largest_share"],
         },
         "rq7_by_borough": ns["rq7_by_borough"].reset_index().to_dict("records"),
         "rq7_mean_percentile_by_type": by_type.to_dict(),
@@ -351,8 +359,21 @@ def results_document(ns: dict) -> dict:
                                                    adjusted_p="p_adjusted"),
             "rq9": estimate_row(reported_ped, "rho_within_borough", "low", "high", adjusted_p="p_adjusted"),
         },
+        # Section 9.6: the RQ2 slope beside its headline.
+        "rq2_checks": {
+            "new_construction_stock": ns["rq2_new_stock"], "preservation_stock": ns["rq2_preserved_stock"],
+            "leave_one_zip_out": {key: ns["rq2_without_one"][key] for key in ["low", "high", "n_zips"]},
+            "most_influential_zip": {**ns["rq2_without_one"]["without"],
+                                     **{key: ns["rq2_without_one"][key] for key in
+                                        ["zip", "share_of_stock_variation_pct", "units_completed", "preservation_units",
+                                         "new_construction_units"]}},
+        },
         "false_discovery_rate": ns["FALSE_DISCOVERY_RATE"],
         "unscreened_variants": unscreened_variants(ns["robustness_table"]),
+        "comparison_subset_check": ns["CHECK_COMPARISON_SUBSET"],
+        "comparison_subset_pretrend": {key: ns["pretrend_not_started"][key] for key in
+                                       ["percent_change", "percent_low", "percent_high"]},
+        "placebo_overlap": ns["placebo_overlap"],
         "largest_clusters": ns["LARGEST_CLUSTERS_SHOWN"],
     }
     return to_plain({"questions": questions, "detail": detail, "facts": ns["facts"],
@@ -395,7 +416,8 @@ def meta_document(ns: dict, grid: dict, near_labels: list[str], out_dir: Path, s
         },
         "constants": {
             "year_start": ns["YEAR_START"], "year_end": ns["YEAR_END"], "buffer_m": ns["BUFFER_M"],
-            "event_window": ns["EVENT_WINDOW"], "n_boot": ns["N_BOOT"], "ci_level": ns["CI_LEVEL"],
+            "event_window": ns["EVENT_WINDOW"], "n_boot": ns["N_BOOT"], "n_boot_joint": ns["N_BOOT_JOINT"],
+            "ci_level": ns["CI_LEVEL"],
             "min_group_n": ns["MIN_GROUP_N"], "seed": ns["SEED"],
             "log_ratio_offset": ns["LOG_RATIO_OFFSET"], "baseline_years": list(ns["BASELINE_YEARS"]),
         },
@@ -502,7 +524,11 @@ def check_against_notebook(ns: dict) -> None:
         for site_key, notebook_key in [("excess", "estimate"), ("low", "low"), ("high", "high")]:
             assert abs(selection[site_key] - estimates.loc[row_name, notebook_key]) < 1e-6, (row_name, site_key)
         assert selection["n"] == int(estimates.loc[row_name, "n_sites"])
-    print("  website code reproduces the notebook's RQ3 and RQ7 estimates and intervals")
+    one_vote = site_data.site_selection(store, new_only)["one_vote"]
+    for site_key, notebook_key in [("estimate", "estimate"), ("low", "low"), ("high", "high")]:
+        assert abs(one_vote[site_key] - estimates.loc[ns["RQ7_ONE_VOTE"], notebook_key]) < 1e-6, ("one vote", site_key)
+    assert study["n_comparison_sites"] == ns["new_build_sizes"]["n_comparison_sites"]
+    print("  website code reproduces the notebook's RQ3 and RQ7 estimates, intervals and site counts")
 
 
 def main() -> int:
