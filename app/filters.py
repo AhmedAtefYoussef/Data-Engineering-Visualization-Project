@@ -5,6 +5,7 @@ A `Filters` value is immutable and hashable, so it can key a cache and travel th
 """
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, field, fields
 
 YEAR_START, YEAR_END = 2016, 2025
@@ -122,17 +123,27 @@ class Filters:
 
 def _keep_known(values, allowed: list[str]) -> tuple[str, ...]:
     """Selected values in canonical order; anything unknown is dropped, and 'all selected' means no filter."""
-    chosen = set(values or [])
+    chosen = {value for value in values if isinstance(value, str)} if isinstance(values, (list, tuple)) else set()
     kept = tuple(value for value in allowed if value in chosen)
     return () if len(kept) == len(allowed) else kept
 
 
 def _year(value, fallback: int) -> int:
     """A year clamped to the study window; `fallback` when the control is empty or malformed."""
+    whole = _whole_number(value)
+    return fallback if whole is None else max(YEAR_START, min(YEAR_END, whole))
+
+
+def _whole_number(value) -> int | None:
+    """`int(value)` for a number or numeric string; None for anything else (lists, dicts, NaN, Infinity)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return None
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
     try:
-        return max(YEAR_START, min(YEAR_END, int(value)))
-    except (TypeError, ValueError):
-        return fallback
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 def make_filters(boroughs=None, year_from=None, year_to=None, construction=None, sizes=None,
@@ -146,8 +157,8 @@ def make_filters(boroughs=None, year_from=None, year_to=None, construction=None,
         sizes=_keep_known(sizes, SIZE_BANDS),
         factors=_keep_known(factors, FACTOR_GROUPS),
         hours=_keep_known(hours, HOUR_BANDS),
-        harm=harm if harm in HARM else DEFAULT_HARM,
-        scope=scope if scope in SCOPE else DEFAULT_SCOPE,
+        harm=harm if isinstance(harm, str) and harm in HARM else DEFAULT_HARM,
+        scope=scope if isinstance(scope, str) and scope in SCOPE else DEFAULT_SCOPE,
         source=source,
     )
 
@@ -160,11 +171,8 @@ def from_dict(stored: dict | None) -> Filters:
 
 def reversed_years_note(year_from, year_to) -> str | None:
     """A sentence when the dropdowns hold a reversed range (it is read the other way round), else None."""
-    try:
-        first, last = int(year_from), int(year_to)
-    except (TypeError, ValueError):
-        return None
-    if first <= last:
+    first, last = _whole_number(year_from), _whole_number(year_to)
+    if first is None or last is None or first <= last:
         return None
     return f"The years were entered as {first} to {last}; they are read as {last} to {first}."
 

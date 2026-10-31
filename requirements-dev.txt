@@ -15,3 +15,5 @@ nbclient>=0.10
 
 # --- Tests ------------------------------------------------------------------------------------
 pytest>=8
+pytest-cov>=5
+ruff>=0.6          # lint: `ruff check app tests tools` (settings in pyproject.toml)
