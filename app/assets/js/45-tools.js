@@ -436,21 +436,21 @@
 
     /* ---- the ranked list ---- */
     var ranking = { borough: "all", type: "all", sort: "baseline", dir: "desc", offset: 0, rows: 0 };
+    /* Four equal cells: two menus (many choices) above two pill groups (few choices). */
     var controls = el("div", "bk-filters");
-    function select(idName, labelText, options) {
-      var wrap = el("div", "bk-select");
-      wrap.appendChild(el("label", "field-label", labelText, { for: idName }));
-      var chooser = el("select", "bk-chooser", null, { id: idName });
-      options.forEach(function (option) { chooser.appendChild(el("option", null, option[1], { value: option[0] })); });
-      wrap.appendChild(chooser);
-      controls.appendChild(wrap);
-      return chooser;
-    }
-    var boroughSelect = select("bk-borough", "Borough", [["all", "All boroughs"]].concat((config.boroughs || []).map(function (name) { return [name, name]; })));
-    var typeSelect = select("bk-type", "Type", [["all", "All types"], ["New Construction", "New construction"], ["Preservation", "Preservation"]]);
-    var sortSelect = select("bk-sort", "Sort by", [["baseline", "Crashes nearby"], ["percentile", "Percentile in borough"], ["units", "Units"], ["completion", "Completion year"], ["project", "Project name"]]);
-    var dirButton = el("button", "button button-quiet bk-dir", "Highest first", { type: "button", "aria-pressed": "false" });
-    var dirWrap = el("div", "bk-select"); dirWrap.appendChild(el("span", "field-label", "Order")); dirWrap.appendChild(dirButton); controls.appendChild(dirWrap);
+    var boroughPick = NYC.picker({ id: "bk-borough", label: "Borough", value: ranking.borough,
+      options: [["all", "All boroughs"]].concat((config.boroughs || []).map(function (name) { return [name, name]; })),
+      onChange: function (v) { ranking.borough = v; loadRanked(false); } });
+    var sortPick = NYC.picker({ id: "bk-sort", label: "Sort by", value: ranking.sort,
+      options: [["baseline", "Crashes nearby"], ["percentile", "Percentile in borough"], ["units", "Units"], ["completion", "Completion year"], ["project", "Project name"]],
+      onChange: function (v) { ranking.sort = v; ranking.dir = v === "project" ? "asc" : "desc"; loadRanked(false); } });
+    var typeSeg = NYC.segmented({ id: "bk-type", label: "Type", value: ranking.type, cols: 3,
+      options: [["all", "All"], ["New Construction", "New"], ["Preservation", "Preservation"]],
+      onChange: function (v) { ranking.type = v; loadRanked(false); } });
+    var dirSeg = NYC.segmented({ id: "bk-dir", label: "Order", value: ranking.dir, cols: 2,
+      options: [["desc", "Highest first"], ["asc", "Lowest first"]],
+      onChange: function (v) { ranking.dir = v; loadRanked(false); } });
+    [boroughPick, sortPick, typeSeg, dirSeg].forEach(function (control) { controls.appendChild(control.el); });
     var listEl = el("ol", "bk-rank-list", null, { "aria-label": "Sites on the most crash-heavy streets" });
     var foot = el("div", "bk-rank-foot");
     var total = el("p", "bk-total", "", { role: "status", "aria-live": "polite" });
@@ -458,7 +458,21 @@
     var csv = el("a", "button button-secondary", "Download CSV", { href: "/block/ranked.csv", download: "sites_on_crash_heavy_streets.csv" });
     var buttons = el("div", "bk-rank-buttons"); buttons.appendChild(more); buttons.appendChild(csv);
     foot.appendChild(total); foot.appendChild(buttons);
-    ranked.appendChild(controls); ranked.appendChild(listEl); ranked.appendChild(foot);
+    /* Above the rows: how many sites the filters leave, counted as it changes, and the filters in words. */
+    var summary = el("p", "bk-summary", null, { "aria-hidden": "true" });
+    var summaryNum = el("span", "bk-summary-num", "0"), summaryText = el("span", "bk-summary-text", "");
+    summary.appendChild(summaryNum); summary.appendChild(summaryText);
+    var shownTotal = 0, cancelTotal = null;
+    function drawSummary(totalRows) {
+      if (cancelTotal) { cancelTotal(); }
+      cancelTotal = tween(shownTotal, totalRows, 650, function (v) { summaryNum.textContent = num(Math.round(v)); });
+      shownTotal = totalRows;
+      var parts = [ranking.borough === "all" ? "all boroughs" : ranking.borough,
+                   ranking.type === "all" ? "both types" : ranking.type.toLowerCase()];
+      summaryText.textContent = (totalRows === 1 ? " site" : " sites") + " · " + parts.join(" · ");
+      summary.classList.remove("is-new"); void summary.offsetWidth; summary.classList.add("is-new");
+    }
+    ranked.appendChild(controls); ranked.appendChild(summary); ranked.appendChild(listEl); ranked.appendChild(foot);
 
     function query(extra) {
       var parts = ["borough=" + encodeURIComponent(ranking.borough), "type=" + encodeURIComponent(ranking.type),
@@ -466,14 +480,14 @@
       return parts.concat(extra || []).join("&");
     }
     function syncFilters() {
-      boroughSelect.value = ranking.borough; typeSelect.value = ranking.type; sortSelect.value = ranking.sort;
-      dirButton.textContent = ranking.dir === "desc" ? "Highest first" : "Lowest first";
-      dirButton.setAttribute("aria-pressed", ranking.dir === "asc" ? "true" : "false");
+      boroughPick.set(ranking.borough); sortPick.set(ranking.sort); typeSeg.set(ranking.type); dirSeg.set(ranking.dir);
       csv.setAttribute("href", "/block/ranked.csv?" + query());
     }
     function rankRow(row, index) {
       var li = el("li", "bk-row", null, { "data-site": String(row.site_id) });
       li.style.setProperty("--i", index);
+      // A bar behind the row: this site's crashes against the most on the list, so the ranking reads at a glance.
+      li.style.setProperty("--w", ranking.top ? Math.max(0.02, Math.min(1, row.baseline_crashes / ranking.top)).toFixed(3) : "0");
       li.appendChild(el("span", "bk-row-rank", String(row.rank)));
       var main = el("div", "bk-row-main");
       var link = el("a", "bk-row-name", row.project, { href: "?site=" + row.site_id + "#block" });
@@ -496,7 +510,10 @@
       return getJSON("/api/block/ranked?" + query(["offset=" + ranking.offset, "limit=25"])).then(function (data) {
         if (seq !== rankSeq || !data) { return; }
         ranked.classList.remove("is-loading");
-        if (!append) { clear(listEl); ranking.rows = 0; }
+        if (!append) {
+          clear(listEl); ranking.rows = 0;
+          ranking.top = data.rows.reduce(function (top, row) { return Math.max(top, row.baseline_crashes || 0); }, 0);
+        }
         data.rows.forEach(function (row, index) { listEl.appendChild(rankRow(row, index)); });
         markRow();
         // On arrival the record panel shows the top site, so the panel is never empty and the reader sees what a
@@ -504,14 +521,11 @@
         if (!append && !opened && data.rows.length) { opened = true; openSite(data.rows[0].site_id, false, true); }
         ranking.rows += data.rows.length; ranking.offset = ranking.rows;
         total.textContent = data.total ? "Showing " + num(ranking.rows) + " of " + num(data.total) + " sites with a crash baseline." : "No site matches these filters.";
+        if (!append) { drawSummary(data.total || 0); }
         more.hidden = !data.has_more;
         more.textContent = "Show " + Math.min(25, data.total - ranking.rows) + " more";
       }).catch(function () { ranked.classList.remove("is-loading"); total.textContent = "The list could not be loaded. Try again."; });
     }
-    boroughSelect.addEventListener("change", function () { ranking.borough = boroughSelect.value; loadRanked(false); });
-    typeSelect.addEventListener("change", function () { ranking.type = typeSelect.value; loadRanked(false); });
-    sortSelect.addEventListener("change", function () { ranking.sort = sortSelect.value; ranking.dir = sortSelect.value === "project" ? "asc" : "desc"; loadRanked(false); });
-    dirButton.addEventListener("click", function () { ranking.dir = ranking.dir === "desc" ? "asc" : "desc"; loadRanked(false); });
     more.addEventListener("click", function () { loadRanked(true); });
     syncFilters();
     loadRanked(false);
@@ -634,6 +648,35 @@
     function updateButtons() {
       backBtn.disabled = !state.past.length;
       resetBtn.disabled = isDefault(state.spec);
+      // Each control that differs from the published comparison carries a gold mark beside its name.
+      KEYS.forEach(function (k) {
+        var g = group(k), control = g && g.closest(".sc-control");
+        if (control) { control.classList.toggle("is-changed", state.spec[k] !== defaults[k]); }
+      });
+    }
+    function pulse(key) {
+      var g = group(key), control = g && g.closest(".sc-control");
+      if (!control || reduced()) { return; }
+      control.classList.remove("is-pulse"); void control.offsetWidth; control.classList.add("is-pulse");
+    }
+
+    /* How far this scenario sits from the published answer, in points, counted as it changes. */
+    var deltaEl = el("p", "sc-delta", "", { "aria-hidden": "true" });
+    var deltaArrow = el("span", "sc-delta-arrow"), deltaNum = el("span", "sc-delta-num"), deltaText = el("span", "sc-delta-text");
+    deltaEl.appendChild(deltaArrow); deltaEl.appendChild(deltaNum); deltaEl.appendChild(deltaText);
+    if (tagEl && tagEl.parentNode) { tagEl.parentNode.insertBefore(deltaEl, tagEl.nextSibling); }
+    var shownDelta = 0, cancelDelta = null;
+    function drawDelta(result) {
+      if (cancelDelta) { cancelDelta(); }
+      if (result.status !== "ok") { deltaEl.className = "sc-delta is-none"; deltaNum.textContent = ""; deltaText.textContent = "No estimate to compare"; return; }
+      var diff = result.estimate - published.estimate;
+      if (result.is_default || Math.abs(diff) < 0.05) {
+        deltaEl.className = "sc-delta is-same"; deltaNum.textContent = ""; deltaText.textContent = "The published result"; shownDelta = 0; return;
+      }
+      deltaEl.className = "sc-delta " + (diff > 0 ? "is-up" : "is-down");
+      deltaText.textContent = diff > 0 ? " points above published" : " points below published";
+      cancelDelta = tween(shownDelta, Math.abs(diff), 700, function (v) { deltaNum.textContent = v.toFixed(1); });
+      shownDelta = Math.abs(diff);
     }
 
     /* the big figure counts to the new estimate; the axis slides; the ghost stays where it was */
@@ -687,7 +730,7 @@
         });
         emptyEl.appendChild(row);
       }
-      moveBar(result); describeAxis(result); drawTrail(result); drawFloat(result);
+      moveBar(result); describeAxis(result); drawTrail(result); drawFloat(result); drawDelta(result);
       if (panelEl && !reduced()) { panelEl.classList.remove("is-fresh"); void panelEl.offsetWidth; panelEl.classList.add("is-fresh"); }
       statusEl.textContent = ok ? "Estimate " + signed(result.estimate) + " percent. " + (result.excludes_zero ? "Excludes zero." : "Cannot be told from no change.") : "No estimate for this choice.";
       state.last = result;
@@ -756,6 +799,8 @@
 
     root.addEventListener("change", function (event) {
       if (syncing || !event.target || event.target.type !== "radio") { return; }
+      var g = event.target.closest(".segmented");
+      if (g && g.id) { pulse(g.id.replace(/^sc-/, "")); }
       setSpec(readSpec(), true);
     });
     backBtn.addEventListener("click", function () { if (state.past.length) { setSpec(state.past.pop(), false); } });

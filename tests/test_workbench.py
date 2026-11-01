@@ -75,3 +75,24 @@ def test_no_rounded_label_lights_its_outline_on_hover():
 def test_the_generate_overlay_animates_no_full_screen_mask():
     css = (ASSETS / "css" / "35-generate.css").read_text(encoding="utf-8")
     assert "--hole" not in css and "backdrop-filter" not in css
+
+
+def test_the_tools_open_no_native_menus():
+    """Every choice is drawn in the page's own style: no <select>, whose list the operating system draws."""
+    tools = (ASSETS / "js" / "45-tools.js").read_text(encoding="utf-8")
+    assert 'el("select"' not in tools and "createElement(\"select\")" not in tools
+    for control in ('NYC.picker({ id: "bk-borough"', 'NYC.picker({ id: "bk-sort"', 'NYC.segmented({ id: "bk-type"', 'NYC.segmented({ id: "bk-dir"'):
+        assert control in tools, control
+
+
+def test_the_picker_is_a_complete_listbox():
+    controls = (ASSETS / "js" / "15-controls.js").read_text(encoding="utf-8")
+    for needle in ['"aria-haspopup", "listbox"', '"aria-expanded"', '"role", "listbox"', '"role", "option"', '"aria-selected"',
+                   '"aria-activedescendant"', '"ArrowDown"', '"ArrowUp"', '"Home"', '"End"', '"Escape"', '"Tab"']:
+        assert needle in controls, needle
+
+
+def test_every_lab_group_has_a_balanced_grid():
+    css = (ASSETS / "css" / "50-tools.css").read_text(encoding="utf-8")
+    for key in ("sites", "borough", "size", "group", "cluster", "cohort"):
+        assert f"#sc-{key}" in css, key
