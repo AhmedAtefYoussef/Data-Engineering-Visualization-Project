@@ -9,7 +9,7 @@ import logging
 
 from dash import dcc, html
 
-from app import story
+from app import charts, components, story
 from app.data import Store
 from app.filters import (BOROUGHS, CONSTRUCTION_TYPES, DEFAULT_HARM, DEFAULT_SCOPE, FACTOR_GROUPS, HARM,
                          HOUR_BAND_RANGES, HOUR_BANDS, SCOPE, SIZE_BANDS, YEAR_END, YEAR_START, YEARS)
@@ -22,17 +22,21 @@ SEARCH_HINT = "Typing fills the filters below and shows here what was understood
 EXAMPLE_QUERIES = ["Brooklyn 2022 new construction", "bronx pedestrians night 2019-2021",
                    "queens cyclists speeding since 2021", "manhattan large buildings near housing"]
 
-# key -> (title, chart type shown as a small label, CSS size class, which datasets it uses)
+# key -> (title, what it is, layout of the card, which datasets it uses)
 CHART_CARDS = {
-    "map": ("Housing sites over crash density", "Map", "card-wide", "Both datasets"),
-    "selection": ("How crash-heavy the streets were at housing sites before construction", "Bar chart", "", "Both datasets"),
-    "trend": ("Crashes over time by borough", "Line chart", "", "Crashes"),
-    "completions": ("Affordable units completed per year", "Bar chart", "", "Housing"),
-    "factors": ("Contributing factors named in police reports", "Bar chart", "", "Crashes"),
-    "heatmap": ("When crashes happen", "Heatmap", "", "Crashes"),
-    "scatter": ("Housing against crashes, one dot per ZIP code", "Scatter plot", "", "Both datasets"),
-    "event": ("Before and after completion", "Line chart with intervals", "card-wide", "Both datasets"),
+    "map": ("Housing sites over crash density", "Map", "card-full card-map", "Both datasets"),
+    "scatter": ("Housing against crashes, one dot per ZIP code", "Scatter plot", "card-split", "Both datasets"),
+    "trend": ("Crashes over time by borough", "Line chart", "card-full", "Crashes"),
+    "heatmap": ("When crashes happen", "Heatmap", "card-split card-flip", "Crashes"),
+    "factors": ("Contributing factors named in police reports", "Bar chart", "card-half card-bars-h", "Crashes"),
+    "completions": ("Affordable units completed per year", "Bar chart", "card-half card-bars", "Housing"),
+    "selection": ("How crash-heavy the streets were at housing sites before construction", "Bar chart",
+                  "card-split card-bars", "Both datasets"),
+    "event": ("Before and after completion", "Line chart with intervals", "card-full card-tall", "Both datasets"),
 }
+# The report reads as four plain parts, each with its charts.
+GROUPS = [("where", "Where", ["map", "scatter"]), ("when", "When", ["trend", "heatmap"]),
+          ("what", "What", ["factors", "completions"]), ("change", "Before and after", ["selection", "event"])]
 # Wheel zoom stays off on the map so that scrolling the page never gets trapped inside it;
 # the map zooms with its buttons, a double click or a pinch.
 MAP_CONFIG = {**GRAPH_CONFIG, "scrollZoom": False}
@@ -82,32 +86,41 @@ def _dropdown(control_id: str, options: list[dict], value=None, multi: bool = Tr
                         maxHeight=OPTION_HEIGHT_PX * MENU_ROWS_VISIBLE, className="dropdown", persistence=False)
 
 
-def controls() -> html.Div:
-    """Search box, the nine dropdowns and the Generate report button."""
-    hour_labels = {band: f"{band} ({HOUR_BAND_RANGES[band]})" for band in HOUR_BANDS}
-    size_labels = {band: f"{band} units" for band in SIZE_BANDS}
-    harm_labels = {key: item["label"] for key, item in HARM.items()}
-    search = html.Div(className="search", children=[
-        html.Label("Search", htmlFor="search", className="field-label"),
-        html.Div(className="search-box", children=[
+GENERATE_CLASS = "button button-primary magnetic generate"
+
+
+def search_box() -> html.Div:
+    """The largest thing on the page: a luminous field. A gold ring traces it on focus (CSS), and while it is empty
+    and not focused the example queries are typed and erased in it (30-explore.js)."""
+    return html.Div(className="search", children=[
+        html.Label("Search", htmlFor="search", className="field-label search-label"),
+        html.Div(className="search-box spot", children=[
+            html.Span(className="search-ring", **{"aria-hidden": "true"}),
             dcc.Input(id="search", type="search", debounce=False, value="", className="search-input",
                       placeholder="Type a place, a period and what you want to see", autoComplete="off",
                       spellCheck=False, n_submit=0, maxLength=200),
-            # The clear button and the key hint share one row on the right of the field, so the gap
-            # between them is set in one place. assets/site.js empties the field when the button is pressed.
+            html.Span(id="search-type", className="search-type", **{"aria-hidden": "true"}),
+            # The clear button and the key hint appear once there is something to clear or run.
             html.Div(className="search-tools", children=[
-                html.Button("\u00d7", id="search-clear", className="search-clear", type="button", n_clicks=0,
+                html.Button("×", id="search-clear", className="search-clear", type="button", n_clicks=0,
                             title="Clear the search", **{"aria-label": "Clear the search"}),
                 html.Span(["Press ", html.Kbd("Enter"), " to generate"], className="search-key",
                           **{"aria-hidden": "true"}),
             ]),
         ]),
-        html.P(["Try ", *[html.Button(text, id=f"example-{position}", className="example",
-                                      n_clicks=0, type="button")
+        html.P(["Try ", *[html.Button(text, id={"type": "example", "index": position}, className="example",
+                                      n_clicks=0, type="button", style={"--i": position}, **{"data-wave": ""})
                           for position, text in enumerate(EXAMPLE_QUERIES)]], className="examples"),
         html.Div(search_hint(), id="search-feedback", className="search-feedback", role="status",
                  **{"aria-live": "polite"}),
     ])
+
+
+def controls() -> html.Div:
+    """Search box, the nine dropdowns and the buttons."""
+    hour_labels = {band: f"{band} ({HOUR_BAND_RANGES[band]})" for band in HOUR_BANDS}
+    size_labels = {band: f"{band} units" for band in SIZE_BANDS}
+    harm_labels = {key: item["label"] for key, item in HARM.items()}
     filters = html.Div(className="fields", children=[
         _field("Borough", "f-borough", _dropdown("f-borough", _options(BOROUGHS), placeholder="All five"), note=MULTI_NOTE),
         _field("From year", "f-year-from", _dropdown("f-year-from", _options(YEARS), YEAR_START, multi=False)),
@@ -127,28 +140,39 @@ def controls() -> html.Div:
                help_text="Near housing: the housing filters apply to each crash's nearest site."),
     ])
     actions = html.Div(className="actions", children=[
-        html.Button("Generate report", id="generate", n_clicks=0, className="button button-primary",
+        html.Button("Generate report", id="generate", n_clicks=0, className=GENERATE_CLASS, type="button"),
+        html.Button("Reset filters", id="reset", n_clicks=0, className="button button-secondary magnetic",
                     type="button"),
-        html.Button("Reset filters", id="reset", n_clicks=0, className="button button-quiet", type="button"),
+        html.Span(className="actions-gap"),
+        html.Button("Copy link", id="copy-link", n_clicks=0, className="button button-secondary magnetic",
+                    type="button"),
+        html.Button("Download CSV", id="download-csv", n_clicks=0, className="button button-secondary magnetic",
+                    type="button"),
+        html.P(id="copy-status", className="copy-status", role="status", **{"aria-live": "polite"}),
         html.P(id="stale-hint", className="stale-hint", role="status", **{"aria-live": "polite"}),
     ])
-    return html.Div([search, html.P("or set the filters yourself", className="divider"), filters, actions],
-                    className="controls", role="group", **{"aria-label": "Report filters"})
+    return html.Div([search_box(), html.P("or set the filters yourself", className="divider"),
+                     components.surface([filters, actions], class_name="controls", role="group",
+                                        **{"aria-label": "Report filters"})],
+                    className="control-block")
 
 
 def graph_box(graph_id: str, config: dict, size_class: str = "") -> html.Div:
     """A graph inside a box whose height is set in CSS, so a new figure never changes the page height."""
-    return html.Div(dcc.Graph(id=graph_id, config=config, responsive=True, style={"height": "100%"}),
+    # The first figure is the dark, empty one: Plotly's own default would flash a light panel before the report arrives.
+    return html.Div(dcc.Graph(id=graph_id, config=config, responsive=True, style={"height": "100%"},
+                              figure=charts.empty_figure("")),
                     className=f"graph {size_class}".strip())
 
 
 def chart_card(key: str) -> html.Article:
-    """One chart with its title, the filters and n behind it, and a note on how to read it."""
+    """One chart with its title, the filters and n behind it, and a note on how to read it. No box: it sits on the ground."""
     title, kind, size_class, datasets = CHART_CARDS[key]
     is_map = key == "map"
-    return html.Article(className=f"card {size_class}".strip(), **{"aria-labelledby": f"title-{key}"}, children=[
+    return html.Article(id=f"card-{key}", className=f"card lift {size_class}".strip(),
+                        **{"aria-labelledby": f"title-{key}"}, children=[
         html.Header(className="card-head", children=[
-            html.H3(title, id=f"title-{key}"),
+            html.H4(title, id=f"title-{key}"),
             html.P(f"{kind} · {datasets}", className="card-kind"),
         ]),
         html.P(id=f"scope-{key}", className="card-scope"),
@@ -158,24 +182,32 @@ def chart_card(key: str) -> html.Article:
     ])
 
 
-def explorer() -> html.Section:
-    return html.Section(id="explore", className="band band-explore", children=[
-        html.H2("Build your own report"),
-        html.P("Type a query or set the filters, then press Generate report. The summary numbers and charts "
-               "below are redrawn for that selection; each chart says which filters it does not use.",
-               className="section-lead"),
-        controls(),
-        dcc.Store(id="report-filters"),
-        html.Div(id="report", className="report", children=[
-            html.H3("Report", className="visually-hidden"),
-            html.Div(id="report-header", className="report-header", role="status", **{"aria-live": "polite"}),
-            html.Div(id="report-tiles", className="tiles"),
-            html.Div([chart_card(key) for key in CHART_KEYS], className="cards"),
-        ]),
-        html.P(["Injury crashes are the default outcome. A crash counts when at least one person was injured or "
-                "killed. Total crash reports cannot be compared across 2020, as ",
-                html.A("the reporting chart", href="#data"), " shows."], className="aside explore-foot"),
+def _group(slug: str, title: str, keys: list[str]) -> html.Section:
+    return html.Section(className=f"group group-{slug}", **{"aria-labelledby": f"group-{slug}"}, children=[
+        html.H3(title, id=f"group-{slug}", className="group-title", **{"data-kinetic": "words"}),
+        html.Div([chart_card(key) for key in keys], className="group-grid"),
     ])
+
+
+def explorer() -> html.Section:
+    return components.section(
+        "explore", "Build your own report",
+        "Type a query or set the filters, then press Generate report. The numbers and charts below are redrawn for "
+        "that selection; each chart says which filters it does not use.",
+        [
+            dcc.Location(id="url", refresh=False),
+            dcc.Store(id="report-filters"), dcc.Store(id="share-url"), dcc.Store(id="explore-sink"), dcc.Download(id="download"),
+            controls(),
+            html.Div(id="report", className="report", children=[
+                html.H3("Report", className="visually-hidden"),
+                html.Div(id="report-header", className="report-header", role="status", **{"aria-live": "polite"}),
+                html.Div(id="report-tiles", className="figures"),
+                *[_group(slug, title, keys) for slug, title, keys in GROUPS],
+            ]),
+            html.P(["Injury crashes are the default outcome. A crash counts when at least one person was injured or "
+                    "killed. Total crash reports cannot be compared across 2020, as ",
+                    html.A("the reporting chart", href="#data"), " shows."], className="aside explore-foot"),
+        ], tint="harbor", class_name="band-explore")
 
 
 def build_layout(store: Store) -> html.Div:
