@@ -66,10 +66,10 @@ def graph(graph_id: str, figure=None, *, size_class: str = "", config: dict | No
 
 def segmented(control_id: str, options: list[dict], value, label: str) -> html.Div:
     """A row of mutually exclusive choices: a real radio group, styled as one track."""
-    return html.Div(className="segmented-field", children=[
+    return html.Div(className="segmented-field", role="radiogroup", **{"aria-labelledby": f"{control_id}-label"}, children=[
         html.Span(label, className="field-label", id=f"{control_id}-label"),
         dcc.RadioItems(id=control_id, options=options, value=value, inline=True, className="segmented",
-                       labelClassName="segment", **{"aria-labelledby": f"{control_id}-label"}),
+                       labelClassName="segment"),
     ])
 
 
