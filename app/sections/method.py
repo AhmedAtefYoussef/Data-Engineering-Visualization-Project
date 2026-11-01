@@ -41,7 +41,7 @@ def _link(text: str, href: str) -> html.A:
 def _tool(label: str, href: str) -> html.A:
     """A button to another part of this page, or to a document in the repository."""
     extra = {"target": "_blank", "rel": "noopener"} if href.startswith("http") else {}
-    return html.A(label, href=href, className="button button-secondary magnetic", **extra)
+    return html.A(label, href=href, className="button button-secondary", **extra)
 
 
 def _part(part_id: str, title: str, children: list, lead: str | list | None = None) -> html.Div:

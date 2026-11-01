@@ -17,7 +17,9 @@ FONT_DISPLAY = '"Bodoni Moda", "Bodoni Moda Fallback", Georgia, "Times New Roman
 FONTS_URL = ("https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..800;1,6..96,400..700"
              "&family=Hanken+Grotesk:wght@400..700&display=swap")
 
-# New York at night: a midnight ground, buildings as warm light, crashes in coral. Gold marks what can be done.
+# New York at night: a midnight ground, buildings as champagne-gold light, crashes in a soft coral that stays
+# readable on navy. Gold marks what can be done. Chosen by contrast (every text colour passes 7:1 on the page)
+# and by eye, against Bodoni's hairlines, which vanish in a deep red.
 COLOR = {
     "page": "#0a0d1a",
     "surface": "#131829",
@@ -28,30 +30,30 @@ COLOR = {
     # text: warm white, stepping down in three contrasts that all pass 4.5:1 on page and surface
     "ink": "#f6f2e9",
     "ink-2": "#c9cad6",
-    "ink-3": "#9ca2b8",
+    "ink-3": "#a9aec3",
     # the one action colour
-    "primary": "#f4b942",
-    "primary-hover": "#ffd071",
+    "primary": "#e5bd6f",
+    "primary-hover": "#f0d08f",
     "on-primary": "#171022",
     # links and the focus ring
-    "accent": "#ffd071",
-    "accent-strong": "#ffe2a3",
+    "accent": "#ecca85",
+    "accent-strong": "#f6e0ad",
     "accent-soft": "#2e2a2c",
     "on-accent": "#171022",
     # notices
     "caution-ink": "#ffd9a0",
     "caution-soft": "#33261c",
     # data: identity colours chosen for a dark ground
-    "housing": "#f4b942",
+    "housing": "#e5bd6f",
     "preservation": "#5fd4c4",
-    "crash": "#ff6f59",
-    "crash-ink": "#ff8a77",
+    "crash": "#ff8f78",
+    "crash-ink": "#ffab95",
     "comparison": "#8d95b3",
     # the not-yet-completed line of the event study
     "reference": "#c9cad6",
     "placebo": "#c9a2ff",
 }
-BOROUGH_COLOR = {"Bronx": "#f4b942", "Brooklyn": "#7fb0ff", "Manhattan": "#ff6f59",
+BOROUGH_COLOR = {"Bronx": "#e5bd6f", "Brooklyn": "#7fb0ff", "Manhattan": "#ff8f78",
                  "Queens": "#5fd4c4", "Staten Island": "#dba2ec"}
 # A second, non-colour channel for the five borough lines.
 BOROUGH_SYMBOL = {"Bronx": "circle", "Brooklyn": "square", "Manhattan": "diamond",
@@ -60,13 +62,13 @@ CONSTRUCTION_COLOR = {"New Construction": COLOR["housing"], "Preservation": COLO
 CONSTRUCTION_SYMBOL = {"New Construction": "circle", "Preservation": "square"}
 # Magnitude: dark to hot, so a busy cell glows on the night ground.
 SEQUENTIAL = [[0.0, "#241a30"], [0.2, "#4a2238"], [0.4, "#84303d"], [0.6, "#c7463f"],
-              [0.8, "#ff6f59"], [1.0, "#ffd0a8"]]
+              [0.8, "#ff8f78"], [1.0, "#f6e0ad"]]
 
 SPACE = {"1": "0.25rem", "2": "0.5rem", "3": "0.75rem", "4": "1rem", "5": "1.5rem", "6": "2rem",
          "7": "3rem", "8": "5rem", "9": "8rem"}
 # One type scale: comfortable reading text, and display sizes that carry the page.
-TYPE = {"xs": "0.8125rem", "sm": "0.9375rem", "base": "1.0625rem", "md": "1.25rem", "lg": "1.625rem",
-        "xl": "2.25rem", "2xl": "3.25rem", "3xl": "4.5rem", "4xl": "6rem"}
+TYPE = {"xs": "0.875rem", "sm": "1rem", "base": "1.125rem", "md": "1.3125rem", "lg": "1.75rem",
+        "xl": "2.5rem", "2xl": "3.5rem", "3xl": "4.25rem", "4xl": "5.75rem"}
 RADIUS = "14px"
 SHADOW = "0 18px 50px rgb(0 0 0 / 0.5)"      # things that truly float: menus, dialogs
 SHADOW_RAISED = SHADOW
@@ -81,6 +83,16 @@ CHART_TICK_SIZE = 12
 MODEBAR_REMOVE = ["zoom", "pan", "zoomin", "zoomout", "autoscale", "lasso", "select"]
 
 
+# Figures are set in a metal: a light top edge, the colour, a deeper foot.
+GOLD_GRADIENT = "linear-gradient(172deg, #fbecc6 0%, #ecc983 38%, #c99a52 100%)"
+CRASH_GRADIENT = "linear-gradient(172deg, #ffd6ca 0%, #ffa18b 42%, #ef7560 100%)"
+
+
+def _rgb(hex_colour: str) -> str:
+    """'#e5bd6f' as '229 189 111', for rgb(var(--gold-rgb) / alpha) in the style sheets."""
+    return " ".join(str(int(hex_colour[i:i + 2], 16)) for i in (1, 3, 5))
+
+
 def css_variables() -> str:
     """The tokens as a `:root { --name: value; }` block for the page head."""
     lines = [f"--color-{name}: {value};" for name, value in COLOR.items()]
@@ -89,6 +101,8 @@ def css_variables() -> str:
     lines += [f"--duration-{name}: {value};" for name, value in DURATION.items()]
     lines += [f"--radius: {RADIUS};", f"--shadow: {SHADOW};", f"--shadow-raised: {SHADOW_RAISED};",
               f"--ease-out: {EASE_OUT};", f"--font: {FONT_STACK};", f"--font-display: {FONT_DISPLAY};",
+              f"--gold-rgb: {_rgb(COLOR['primary'])};", f"--crash-rgb: {_rgb(COLOR['crash'])};",
+              f"--gold-gradient: {GOLD_GRADIENT};", f"--crash-gradient: {CRASH_GRADIENT};",
               "color-scheme: dark;"]
     return ":root {" + " ".join(lines) + "}"
 

@@ -94,8 +94,8 @@ def _row(store: Store, key: str, item: dict, extra: str | None) -> html.Li:
                 html.P(extra, className="fd-extra") if extra else None,
                 html.Dl(facts, className="fd-facts"),
                 html.Div(className="fd-links", children=[
-                    html.A("Explore the records", href="#explore", className="button button-secondary magnetic"),
-                    html.A("Test it", href="#lab", className="button button-secondary magnetic"),
+                    html.A("Explore the records", href="#explore", className="button button-secondary"),
+                    html.A("Test it", href="#lab", className="button button-secondary"),
                     html.A("Link to this finding", href=f"#{slug}", className="button button-quiet",
                            **{"data-rq-link": slug}),
                 ]),
@@ -167,7 +167,7 @@ def layout(store: Store) -> html.Section:
                     id="fd-list", className="fd-list"),
             html.Div(className="fd-empty", id="fd-empty", hidden=True, children=[
                 html.P("No question matches these filters."),
-                html.Button("Show all questions", type="button", className="button button-secondary magnetic",
+                html.Button("Show all questions", type="button", className="button button-secondary",
                             id="fd-reset"),
             ]),
             _robustness(store),

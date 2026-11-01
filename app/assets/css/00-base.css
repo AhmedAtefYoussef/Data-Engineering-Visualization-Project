@@ -16,8 +16,10 @@ body {
 h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; }
 ul, ol { padding: 0; list-style: none; }
 h1, h2 { font-family: var(--font-display); font-weight: 500; font-optical-sizing: auto; text-wrap: balance; }
-h1 { font-size: clamp(2.5rem, min(1.2rem + 4.4vw, 8.4vh), var(--text-4xl)); line-height: 1.02; letter-spacing: -0.02em; }
-h2 { font-size: clamp(2.25rem, 1.4rem + 3.2vw, var(--text-3xl)); line-height: 1.05; letter-spacing: -0.015em; }
+/* Optical sizes chosen for a dark ground: at the largest size Bodoni's hairlines thin away on navy, so the display
+   type is set a step smaller than its point size, which keeps the contrast and holds the strokes. */
+h1 { font-size: clamp(2.5rem, min(1.2rem + 4vw, 8vh), var(--text-4xl)); font-variation-settings: "opsz" 48; line-height: 1.03; letter-spacing: -0.02em; }
+h2 { font-size: clamp(2.25rem, 1.4rem + 2.8vw, var(--text-3xl)); font-variation-settings: "opsz" 36; line-height: 1.06; letter-spacing: -0.015em; }
 h3 { font-size: var(--text-md); font-weight: 600; line-height: 1.3; letter-spacing: -0.005em; text-wrap: balance; }
 p { text-wrap: pretty; }
 a { color: var(--color-accent); text-decoration-thickness: 1px; text-underline-offset: 0.2em; transition: color var(--duration-fast) ease-out; }
@@ -39,4 +41,6 @@ q { quotes: "\201C" "\201D"; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .button:active { transform: none; }
+  .lift { opacity: 1 !important; transform: none !important; filter: none !important; }
+  .step-card { opacity: 1 !important; transform: none !important; filter: none !important; }
 }

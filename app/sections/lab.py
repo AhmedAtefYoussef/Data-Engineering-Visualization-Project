@@ -36,7 +36,7 @@ def _control(key: str, label: str, help_text: str, store: Store) -> html.Div:
 
 
 def _button(button_id: str, text: str, **extra) -> html.Button:
-    return html.Button(text, id=button_id, type="button", className="button button-secondary magnetic", **extra)
+    return html.Button(text, id=button_id, type="button", className="button button-secondary", **extra)
 
 
 def layout(store: Store) -> html.Section:

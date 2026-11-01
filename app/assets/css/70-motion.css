@@ -7,8 +7,8 @@
 .is-in .kw-i { transform: none; opacity: 1; filter: blur(0); }
 
 /* Whole blocks that fade up as they enter. */
-.lift { opacity: 0; transform: translateY(26px); transition: opacity 900ms var(--ease-out), transform 900ms var(--ease-out); transition-delay: calc(var(--i, 0) * 70ms); }
-.lift.is-in { opacity: 1; transform: none; }
+.lift { opacity: 0; transform: translateY(22px); filter: blur(6px); transition: opacity 1000ms var(--ease-out), transform 1000ms var(--ease-out), filter 900ms var(--ease-out); transition-delay: calc(var(--i, 0) * 70ms); }
+.lift.is-in { opacity: 1; transform: none; filter: none; }
 
 /* Scroll-lit words: the script sets each word's opacity from the scroll position. */
 .sw { transition: opacity 180ms linear; }

@@ -76,4 +76,4 @@ def segmented(control_id: str, options: list[dict], value, label: str) -> html.D
 def fx_button(label, button_id: str, primary: bool = True, **attrs) -> html.Button:
     """A button with the page's hover: it leans toward the pointer, a light sweeps it, a press sends a ripple."""
     kind = "button-primary" if primary else "button-secondary"
-    return html.Button(label, id=button_id, n_clicks=0, type="button", className=f"button {kind} magnetic", **attrs)
+    return html.Button(label, id=button_id, n_clicks=0, type="button", className=f"button {kind}", **attrs)

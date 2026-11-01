@@ -1,14 +1,23 @@
 /* The stage: one canvas, one particle per located building, drawn as a point of warm light.
 
-   NYC.Stage.go(layoutName) moves the same particles to a new arrangement in two stages: first the buildings that
-   leave fade, then those that stay travel. Add arrangements with NYC.Stage.layouts[name] = function (stage) {...},
-   which returns { x: Float32Array, y: Float32Array, alpha: Float32Array, size?: Float32Array } in CSS pixels. */
+   NYC.Stage.go(layoutName) sends the same particles to a new arrangement. The buildings that leave fade first;
+   the rest travel as a swarm, each on its own slightly curved path and a little after its neighbour, so the city
+   scatters and regathers instead of sliding. Arrangements live in NYC.Stage.layouts[name] = function (stage) {...}
+   and return, in CSS pixels:
+
+     { x, y, alpha: Float32Array, size?: Float32Array, tone?: Uint8Array, marks?: [...] }
+
+   tone picks the light: 0 preservation (teal), 1 new construction (gold), 2 crash (coral), 3 highlight (white gold).
+   marks are the chart's words and rules, drawn over the points and faded in once they arrive:
+     { t: "text", x, y, text, size?, color?, align?, baseline?, font?: "display" | "sans", weight? }
+     { t: "line", x1, y1, x2, y2, color?, width?, dash? } */
 (function () {
   "use strict";
 
   var NYC = window.NYC;
-  var COLOR_NEW = [244, 185, 66], COLOR_PRESERVATION = [95, 212, 196];
-  var FADE_MS = 280, MOVE_MS = 950, SPARK_PX = 14, INTRO_MS = 2200;
+  var TONES = [[95, 212, 196], [232, 192, 116], [255, 143, 120], [255, 240, 205]];
+  var FADE_MS = 260, MOVE_MS = 1250, SPREAD_MS = 520, SPARK_PX = 14, INTRO_MS = 2200, ARC_PX = 70;
+  var FONT_SANS = "\"Hanken Grotesk\", system-ui, sans-serif", FONT_DISPLAY = "\"Bodoni Moda\", Georgia, serif";
 
   function sprite(rgb) {
     var size = SPARK_PX * 2, canvas = document.createElement("canvas");
@@ -25,7 +34,14 @@
     return canvas;
   }
 
-  var Stage = NYC.Stage = { layouts: {}, data: null, width: 0, height: 0, listeners: [] };
+  var Stage = NYC.Stage = { layouts: {}, data: null, width: 0, height: 0, listeners: [], layoutName: "city" };
+
+  /* Where a chart may draw: the right of the screen on wide screens, the top half on narrow ones. */
+  Stage.region = function (stage) {
+    var w = stage.width, h = stage.height;
+    if (w > 960) { return { x0: w * 0.5, x1: w * 0.94, y0: h * 0.17, y1: h * 0.84, wide: true }; }
+    return { x0: w * 0.07, x1: w * 0.93, y0: h * 0.2, y1: h * 0.5, wide: false };
+  };
 
   Stage.layouts.city = function (stage) {
     var data = stage.data, n = data.n, x = new Float32Array(n), y = new Float32Array(n), alpha = new Float32Array(n);
@@ -48,34 +64,70 @@
 
   NYC.onMount("#ov-stage", function (host) {
     var canvas = host.querySelector("canvas"), context = canvas.getContext("2d");
-    var sprites = [sprite(COLOR_PRESERVATION), sprite(COLOR_NEW)];
-    var scale = 1, current = null, from = null, to = null, startedAt = 0, seeds = null, visible = true, pointerX = 0, pointerY = 0, driftX = 0, driftY = 0;
-    var layoutName = "city", intro = true, running = false;
+    var sprites = TONES.map(sprite);
+    var scale = 1, current = null, from = null, to = null, startedAt = 0, seeds = null, visible = true;
+    var pointerX = 0, pointerY = 0, driftX = 0, driftY = 0;
+    var intro = true, running = false, marks = [], oldMarks = [], marksIn = 1;
 
     function resize() {
       scale = Math.min(window.devicePixelRatio || 1, 2);
       Stage.width = host.clientWidth; Stage.height = host.clientHeight;
       canvas.width = Math.round(Stage.width * scale); canvas.height = Math.round(Stage.height * scale);
       if (!Stage.data) { return; }
-      var layout = Stage.layouts[layoutName](Stage);
-      if (current) { current = copy(layout); from = to = null; } else { current = copy(layout); }
+      var layout = Stage.layouts[Stage.layoutName](Stage);
+      current = copy(layout); from = to = null; marks = layout.marks || []; oldMarks = []; marksIn = 1;
       kick();
     }
-    function copy(layout) { return { x: layout.x.slice(), y: layout.y.slice(), alpha: layout.alpha.slice(), size: layout.size ? layout.size.slice() : null }; }
+    function copy(layout) {
+      return { x: layout.x.slice(), y: layout.y.slice(), alpha: layout.alpha.slice(),
+               size: layout.size ? layout.size.slice() : null, tone: layout.tone ? layout.tone.slice() : null };
+    }
+
+    function drawMarks(list, opacity) {
+      if (opacity <= 0.01) { return; }
+      context.globalCompositeOperation = "source-over";
+      list.forEach(function (mark) {
+        context.globalAlpha = opacity * (mark.opacity == null ? 1 : mark.opacity);
+        if (mark.t === "line") {
+          context.strokeStyle = mark.color || "rgba(201,202,214,0.5)";
+          context.lineWidth = mark.width || 1;
+          context.setLineDash(mark.dash || []);
+          context.beginPath(); context.moveTo(mark.x1, mark.y1); context.lineTo(mark.x2, mark.y2); context.stroke();
+          context.setLineDash([]);
+        } else {
+          var display = mark.font === "display";
+          context.font = (mark.weight || (display ? 600 : 500)) + " " + (mark.size || 13) + "px " + (display ? FONT_DISPLAY : FONT_SANS);
+          context.fillStyle = mark.color || "#c9cad6";
+          context.textAlign = mark.align || "left";
+          context.textBaseline = mark.baseline || "alphabetic";
+          context.shadowColor = "rgba(10,13,26,0.9)"; context.shadowBlur = 10;
+          context.fillText(mark.text, mark.x, mark.y);
+          context.shadowBlur = 0;
+        }
+      });
+      context.globalAlpha = 1;
+    }
 
     function draw(now) {
       running = false;
       if (!Stage.data || !current) { return; }
-      var n = Stage.data.n, i, more = false, reduced = NYC.reducedMotion();
+      var n = Stage.data.n, i, more = false, reduced = NYC.reducedMotion(), settled = !to;
       if (to) {
-        var elapsed = now - startedAt, fade = Math.min(1, elapsed / FADE_MS), move = NYC.easeOut(Math.min(1, Math.max(0, (elapsed - FADE_MS) / MOVE_MS)));
+        var elapsed = now - startedAt, fade = Math.min(1, elapsed / FADE_MS), finished = true;
         for (i = 0; i < n; i++) {
-          var leaving = to.alpha[i] < from.alpha[i];
+          var local = Math.min(1, Math.max(0, (elapsed - FADE_MS - seeds.delay[i] * SPREAD_MS) / MOVE_MS));
+          if (local < 1) { finished = false; }
+          var move = NYC.easeInOut(local), leaving = to.alpha[i] < from.alpha[i];
           current.alpha[i] = leaving ? from.alpha[i] + (to.alpha[i] - from.alpha[i]) * fade : from.alpha[i] + (to.alpha[i] - from.alpha[i]) * move;
-          current.x[i] = from.x[i] + (to.x[i] - from.x[i]) * move;
-          current.y[i] = from.y[i] + (to.y[i] - from.y[i]) * move;
+          // A curved path: the particle swings out to one side and comes back, as if carried by a current.
+          var dx = to.x[i] - from.x[i], dy = to.y[i] - from.y[i], bow = Math.sin(Math.PI * move) * seeds.arc[i];
+          var length = Math.sqrt(dx * dx + dy * dy) || 1;
+          current.x[i] = from.x[i] + dx * move - dy / length * bow;
+          current.y[i] = from.y[i] + dy * move + dx / length * bow;
+          if (from.size && to.size) { current.size[i] = from.size[i] + (to.size[i] - from.size[i]) * move; }
         }
-        if (elapsed >= FADE_MS + MOVE_MS) { from = to = null; } else { more = true; }
+        marksIn = Math.max(0, Math.min(1, (elapsed - FADE_MS - MOVE_MS * 0.55) / 500));
+        if (finished && marksIn >= 1) { from = to = null; oldMarks = []; current.tone = current.toneNext || current.tone; } else { more = true; }
       }
       driftX += (pointerX - driftX) * 0.06; driftY += (pointerY - driftY) * 0.06;
       if (Math.abs(pointerX - driftX) > 0.2 || Math.abs(pointerY - driftY) > 0.2) { more = true; }
@@ -84,6 +136,7 @@
       context.clearRect(0, 0, Stage.width, Stage.height);
       context.globalCompositeOperation = "lighter";
       var introT = intro && !reduced ? Math.min(1, (now - seeds.start) / INTRO_MS) : 1;
+      var city = Stage.layoutName === "city", tones = current.tone || Stage.data.new;
       for (i = 0; i < n; i++) {
         var a = current.alpha[i];
         if (a <= 0.01) { continue; }
@@ -93,22 +146,31 @@
         var flare = introT < 1 ? 1 + (1 - shown) * 1.6 : 1;
         var size = (current.size ? current.size[i] : seeds.size[i]) * flare;
         var twinkle = reduced ? 1 : 0.86 + 0.14 * Math.sin(now * seeds.rate[i] + seeds.phase[i]);
+        // In a chart the points breathe in place, a pixel at most, so the chart stays exact but alive.
+        var float = !reduced && settled && !city ? Math.sin(now * seeds.rate[i] * 0.7 + seeds.phase[i]) * 0.8 : 0;
         context.globalAlpha = a * shown * twinkle;
-        context.drawImage(sprites[Stage.data.new[i]], current.x[i] + driftX - size / 2, current.y[i] + driftY - size / 2, size, size);
+        context.drawImage(sprites[tones[i]], current.x[i] + driftX - size / 2, current.y[i] + driftY + float - size / 2, size, size);
       }
       context.globalAlpha = 1;
+      if (oldMarks.length) { drawMarks(oldMarks, 1 - Math.min(1, (now - startedAt) / FADE_MS)); }
+      drawMarks(marks, marksIn);
       if (introT >= 1) { intro = false; }
       if (more || intro || (visible && !reduced)) { kick(); }
     }
     function kick() { if (running || !visible) { return; } running = true; window.requestAnimationFrame(draw); }
 
     Stage.go = function (name) {
-      if (!Stage.layouts[name] || !current) { return; }
-      layoutName = name;
-      var target = copy(Stage.layouts[name](Stage));
-      if (NYC.reducedMotion()) { current = target; from = to = null; kick(); return; }
+      if (!Stage.layouts[name] || !current || name === Stage.layoutName) { return; }
+      Stage.layoutName = name;
+      var layout = Stage.layouts[name](Stage), target = copy(layout);
+      oldMarks = marks; marks = layout.marks || []; marksIn = 0;
+      if (!target.size) { target.size = seeds.size.slice(); }
+      if (!current.size) { current.size = seeds.size.slice(); }
+      if (NYC.reducedMotion()) { current = target; from = to = null; oldMarks = []; marksIn = 1; kick(); return; }
+      // The new colour shows from the start of the journey, so a point is already what it will mean when it lands.
+      current.tone = target.tone || null; current.toneNext = current.tone;
       from = copy(current); to = target; startedAt = performance.now();
-      if (target.size) { current.size = target.size; } else { current.size = null; }
+      for (var i = 0; i < Stage.data.n; i++) { seeds.arc[i] = (Math.random() - 0.5) * 2 * ARC_PX; }
       kick();
     };
 
@@ -129,13 +191,15 @@
     }).then(function (data) {
       Stage.data = data;
       var n = data.n, i;
-      seeds = { size: new Float32Array(n), rate: new Float32Array(n), phase: new Float32Array(n), delay: new Float32Array(n), start: performance.now() };
+      seeds = { size: new Float32Array(n), rate: new Float32Array(n), phase: new Float32Array(n), delay: new Float32Array(n),
+                arc: new Float32Array(n), start: performance.now() };
       for (i = 0; i < n; i++) {
         seeds.size[i] = Math.min(10, 4.5 + Math.log10(1 + data.units[i]) * 1.8);
         seeds.rate[i] = 0.0006 + Math.random() * 0.0016;
         seeds.phase[i] = Math.random() * 6.28;
         seeds.delay[i] = Math.random() * 0.75;
       }
+      Stage.seeds = seeds;
       resize();
       Stage.listeners.forEach(function (listener) { listener(data); });
     }).catch(function (error) {

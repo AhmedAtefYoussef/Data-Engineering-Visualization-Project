@@ -14,9 +14,8 @@ NAV = [("story", "The story"), ("block", "Your block"), ("lab", "Test it"), ("ex
 
 
 def _nav_link(target: str, label: str) -> html.A:
-    """Two stacked copies of the label: on hover the first rolls away and the second rolls in."""
-    return html.A(html.Span([html.Span(label, className="roll-a"), html.Span(label, className="roll-b", **{"aria-hidden": "true"})],
-                            className="roll"), href=f"#{target}", className="nav-link")
+    """One link. A lit pill glides beneath it on hover and rests under the section in view (assets/js/00-motion.js)."""
+    return html.A(label, href=f"#{target}", className="nav-link")
 
 
 def _masthead() -> html.Header:

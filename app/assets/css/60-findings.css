@@ -90,8 +90,8 @@
   top: calc(50% - 9px); width: 18px; height: 18px; margin-left: -9px; background: var(--color-ink); box-shadow: 0 0 0 5px rgb(246 242 233 / 0.12);
   transition: left 1500ms var(--ease-out) 240ms;
 }
-.fd-row[data-reading="clear"] .fd-ground .interval-bar { background: var(--color-primary); opacity: 1; box-shadow: 0 0 30px 2px rgb(244 185 66 / 0.5); }
-.fd-row[data-reading="clear"] .fd-ground .interval-dot { background: var(--color-primary); box-shadow: 0 0 0 5px rgb(244 185 66 / 0.2), 0 0 26px 4px rgb(244 185 66 / 0.55); }
+.fd-row[data-reading="clear"] .fd-ground .interval-bar { background: var(--color-primary); opacity: 1; box-shadow: 0 0 30px 2px rgb(var(--gold-rgb) / 0.5); }
+.fd-row[data-reading="clear"] .fd-ground .interval-dot { background: var(--color-primary); box-shadow: 0 0 0 5px rgb(var(--gold-rgb) / 0.2), 0 0 26px 4px rgb(var(--gold-rgb) / 0.55); }
 .fd-list .fd-row:not(.is-in) .interval-bar { left: 50% !important; right: 50% !important; }
 .fd-list .fd-row:not(.is-in) .interval-dot { left: 50% !important; }
 
@@ -166,12 +166,12 @@
 .md-journey { --p: 1; position: relative; margin-top: var(--space-7); }
 .md-track { position: absolute; left: 0; right: 0; top: 8px; height: 2px; border-radius: 1px; background: var(--color-line-strong); }
 .md-fill { position: absolute; inset: 0; border-radius: 1px; background: linear-gradient(90deg, transparent, var(--color-primary)); transform: scaleX(var(--p)); transform-origin: left; }
-.md-head { position: absolute; top: 50%; left: calc(var(--p) * 100%); width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--color-accent-strong); box-shadow: 0 0 22px 7px rgb(244 185 66 / 0.6); }
+.md-head { position: absolute; top: 50%; left: calc(var(--p) * 100%); width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--color-accent-strong); box-shadow: 0 0 22px 7px rgb(var(--gold-rgb) / 0.6); }
 .md-stages { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-7); }
 .md-stage { position: relative; padding-top: var(--space-6); transition: opacity 700ms var(--ease-out); }
 .md-journey.is-live .md-stage:not(.is-lit) { opacity: 0.32; }
 .md-node { position: absolute; left: 0; top: 0; width: 18px; height: 18px; border-radius: 50%; background: var(--tint); border: 2px solid var(--color-line-strong); transition: background-color 500ms ease-out, border-color 500ms ease-out, box-shadow 700ms ease-out; }
-.md-journey:not(.is-live) .md-node, .md-stage.is-lit .md-node { background: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 22px 3px rgb(244 185 66 / 0.55); }
+.md-journey:not(.is-live) .md-node, .md-stage.is-lit .md-node { background: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 22px 3px rgb(var(--gold-rgb) / 0.55); }
 .md-stage h4 { font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); line-height: 1.1; letter-spacing: -0.015em; }
 .md-stage-blurb { max-width: 28ch; margin-top: var(--space-2); color: var(--color-ink-2); font-size: var(--text-sm); line-height: 1.5; }
 .md-tables { margin-top: var(--space-5); }
@@ -196,7 +196,7 @@
 }
 .md-input::placeholder { color: var(--color-ink-3); }
 .md-input:hover { border-color: var(--color-ink-3); }
-.md-input:focus-visible { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgb(244 185 66 / 0.25); }
+.md-input:focus-visible { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgb(var(--gold-rgb) / 0.25); }
 .md-clean-count { color: var(--color-ink-3); font-size: var(--text-sm); }
 .md-clean-count.is-tick { animation: arrive var(--duration-slow) var(--ease-out); }
 .md-table-surface { margin-top: var(--space-5); padding: var(--space-2); }

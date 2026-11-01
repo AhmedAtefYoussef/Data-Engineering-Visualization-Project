@@ -85,7 +85,7 @@ def _dropdown(control_id: str, options: list[dict], value=None, multi: bool = Tr
                         maxHeight=OPTION_HEIGHT_PX * MENU_ROWS_VISIBLE, className="dropdown", persistence=False)
 
 
-GENERATE_CLASS = "button button-primary magnetic generate"
+GENERATE_CLASS = "button button-primary generate"
 
 
 def search_box() -> html.Div:
@@ -140,12 +140,12 @@ def controls() -> html.Div:
     ])
     actions = html.Div(className="actions", children=[
         html.Button("Generate report", id="generate", n_clicks=0, className=GENERATE_CLASS, type="button"),
-        html.Button("Reset filters", id="reset", n_clicks=0, className="button button-secondary magnetic",
+        html.Button("Reset filters", id="reset", n_clicks=0, className="button button-secondary",
                     type="button"),
         html.Span(className="actions-gap"),
-        html.Button("Copy link", id="copy-link", n_clicks=0, className="button button-secondary magnetic",
+        html.Button("Copy link", id="copy-link", n_clicks=0, className="button button-secondary",
                     type="button"),
-        html.Button("Download CSV", id="download-csv", n_clicks=0, className="button button-secondary magnetic",
+        html.Button("Download CSV", id="download-csv", n_clicks=0, className="button button-secondary",
                     type="button"),
         html.P(id="copy-status", className="copy-status", role="status", **{"aria-live": "polite"}),
         html.P(id="stale-hint", className="stale-hint", role="status", **{"aria-live": "polite"}),
