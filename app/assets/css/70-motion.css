@@ -12,8 +12,3 @@
 
 /* Scroll-lit words: the script sets each word's opacity from the scroll position. */
 .sw { transition: opacity 180ms linear; }
-
-/* A wave through the letters on hover. */
-.wl { display: inline-block; white-space: pre; }
-[data-wave]:hover .wl { animation: wave 460ms var(--ease-out) calc(var(--i) * 18ms); }
-@keyframes wave { 40% { transform: translateY(-0.28em); color: var(--color-primary); } }

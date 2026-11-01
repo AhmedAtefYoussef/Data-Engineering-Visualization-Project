@@ -186,8 +186,6 @@
 /* Controls */
 .sc-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6) var(--space-7); }
 .sc-control { min-width: 0; }
-.sc-control .segmented { border-radius: var(--radius); }
-.sc-control .segment { border-radius: calc(var(--radius) - 4px); }
 .sc-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .sc-actions .button:disabled { opacity: 0.45; cursor: not-allowed; }
 
@@ -214,4 +212,188 @@
   .sc-controls { padding: var(--space-5); }
   .sc-zero-label { translate: -20% 0; }
 }
-@media (pointer: coarse) { .sc-control .segment { min-height: 2.75rem; } }
+
+
+/* ================================================================ THE WORKBENCHES
+   Both tools are two panes: what you choose on the left, what it means on the right. The right pane stays in view
+   (sticky) and scrolls inside itself, so every click is seen landing without the page moving. Below 1100px the
+   panes stack, with the answer placed before the long list or the choices. */
+.bk-pane, .sc-pane { min-width: 0; }
+.bk-pane-record, .sc-pane-result { position: sticky; top: 5.25rem; }
+.bk-record.surface, .sc-panel.surface {
+  max-height: calc(100vh - 6.5rem); max-height: calc(100dvh - 6.5rem); overflow: auto; overscroll-behavior: contain; scrollbar-width: thin;
+  padding: clamp(1.25rem, 2vw, var(--space-6)); background: linear-gradient(180deg, rgb(255 255 255 / 0.035), rgb(255 255 255 / 0.012)), var(--color-surface);
+  border-color: rgb(255 255 255 / 0.07); box-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.8), inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+.sc-pane-kicker, .bk-welcome-kicker { color: var(--color-ink-3); font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
+
+/* ---- Your block ---- */
+.chapter-block .bk-root.bk-workbench { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: var(--space-6) var(--space-7); max-width: none; align-items: start; }
+.bk-pane-list { display: grid; gap: var(--space-6); }
+.bk-workbench .bk-field { max-width: none; }
+.bk-workbench .bk-label { font-size: var(--text-md); }
+.bk-workbench .bk-input { min-height: 3.5rem; font-size: var(--text-base); }
+.bk-workbench .bk-rank { gap: var(--space-3); max-width: none; }
+.bk-rank-head { display: grid; gap: var(--space-2); }
+.bk-workbench .bk-rank-title { font-size: var(--text-lg); }
+.bk-workbench .bk-rank-note { font-size: var(--text-xs); }
+/* Four equal cells, one control height: two menus above two pill groups. */
+.bk-workbench .bk-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-4); margin: var(--space-3) 0 var(--space-4); }
+.bk-workbench .bk-filters .field-label, .sc-workbench .field-label { margin-bottom: var(--space-2); color: var(--color-ink-2); font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.bk-workbench .bk-rank-list { max-height: min(60vh, 38rem); overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; border-top: 1px solid var(--color-line-strong);
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 2.5rem), transparent); mask-image: linear-gradient(180deg, #000 calc(100% - 2.5rem), transparent); }
+.bk-workbench .bk-row { isolation: isolate; position: relative; grid-template-columns: 2rem minmax(0, 1fr) auto; gap: var(--space-3); padding: var(--space-3) var(--space-3); border-radius: 10px; border-bottom-color: transparent;
+  box-shadow: inset 0 -1px 0 var(--color-line); transition: background-color var(--duration-base) ease-out, box-shadow var(--duration-base) ease-out; }
+.bk-workbench .bk-row:hover { background: rgb(255 255 255 / 0.035); }
+.bk-workbench .bk-row.is-selected { background: linear-gradient(90deg, rgb(var(--gold-rgb) / 0.12), rgb(var(--gold-rgb) / 0.02)); box-shadow: inset 2px 0 0 var(--color-primary), inset 0 -1px 0 transparent; }
+.bk-workbench .bk-row.is-selected .bk-row-name { color: var(--color-accent-strong); }
+.bk-workbench .bk-row-name::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }     /* the whole row is the link */
+.bk-workbench .bk-row-name:focus-visible { outline: none; }
+.bk-workbench .bk-row-name:focus-visible::after { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.bk-workbench .bk-row-rank { font-size: var(--text-sm); }
+.bk-workbench .bk-row-meta { font-size: var(--text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bk-workbench .bk-row-num { font-size: var(--text-md); }
+.bk-workbench .bk-rank-foot { padding-top: var(--space-3); }
+
+/* The record, sized for its pane */
+.bk-workbench .bk-record-inner { gap: var(--space-6); grid-template-columns: minmax(0, 1fr); }
+.bk-workbench .bk-record-inner > *, .bk-workbench .bk-head > * { min-width: 0; }
+.bk-workbench .bk-name { font-size: clamp(1.75rem, 1rem + 1.7vw, 2.6rem); }
+.bk-workbench .bk-facts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.bk-workbench .bk-fact { flex: 1 1 auto; padding: var(--space-2) var(--space-4); border-radius: 10px; background: rgb(255 255 255 / 0.03); border: 1px solid rgb(255 255 255 / 0.05); }
+.bk-workbench .bk-fact-label { font-size: var(--text-xs); }
+.bk-workbench .bk-fact-value { font-size: var(--text-md); overflow-wrap: break-word; white-space: nowrap; }
+.bk-workbench .bk-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-6); }
+.bk-workbench .bk-strip { height: 7rem; margin: var(--space-6) var(--space-4) 0; }
+.bk-workbench .bk-ends { margin-inline: var(--space-4); }
+.bk-workbench .bk-big { font-size: clamp(2.75rem, 1.5rem + 2.6vw, 4rem); }
+.bk-workbench .bk-years { height: 8.5rem; }
+.bk-workbench .bk-text { font-size: var(--text-sm); }
+.bk-workbench .bk-nearby { max-width: none; }
+.bk-record.is-loading > * { opacity: 0.45; filter: saturate(0.6); transition: opacity var(--duration-base) ease-out, filter var(--duration-base) ease-out; }
+.bk-welcome { align-content: center; min-height: 18rem; gap: var(--space-3); }
+.bk-welcome-title { font-family: var(--font-display); font-size: var(--text-lg); font-variation-settings: "opsz" 28; line-height: 1.2; }
+
+/* ---- Try to break the result ---- */
+.chapter-lab .sc-root.sc-workbench { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: var(--space-6) var(--space-7); max-width: none; align-items: start; }
+.sc-pane-controls { display: grid; gap: var(--space-4); }
+.sc-workbench .sc-controls { grid-template-columns: minmax(0, 1fr); gap: 0; padding: var(--space-2) var(--space-5); border: 1px solid var(--color-line); border-radius: var(--radius); background: rgb(255 255 255 / 0.02); }
+.sc-workbench .sc-control { display: grid; gap: var(--space-1); padding-block: var(--space-4); }
+.sc-workbench .sc-control + .sc-control { border-top: 1px solid var(--color-line); }
+.sc-workbench .sc-control .field-help { font-size: var(--text-xs); }
+.sc-workbench .sc-actions { justify-content: flex-start; }
+.sc-panel { display: grid; gap: var(--space-4); }
+.sc-workbench .sc-readout { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-5); }
+.sc-workbench .sc-value { font-size: clamp(3.25rem, 1.4rem + 4.4vw, 6.25rem); background-image: var(--crash-gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.sc-workbench .sc-value.is-empty { background: none; color: var(--color-ink-3); font-size: clamp(2rem, 1rem + 2.5vw, 3rem); }
+.sc-workbench .sc-range { font-size: var(--text-sm); color: var(--color-ink-2); }
+.sc-workbench .sc-axis { padding-top: var(--space-2); }
+.sc-workbench .sc-sentence { font-size: var(--text-sm); color: var(--color-ink-2); line-height: 1.6; }
+.sc-workbench .sc-lower { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--color-line); }
+.sc-workbench .sc-count { font-size: var(--text-lg); }
+.sc-workbench .sc-count-note { font-size: var(--text-xs); }
+.sc-workbench .sc-history-title { font-size: var(--text-sm); color: var(--color-ink-2); }
+.sc-panel.is-fresh { animation: panel-land 900ms var(--ease-out); }
+@keyframes panel-land { 0% { box-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.8), inset 0 0 0 1px rgb(var(--gold-rgb) / 0.35); } 100% { box-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.8), inset 0 0 0 1px rgb(var(--gold-rgb) / 0); } }
+
+/* Where the answer has been: one faint mark per scenario tried, the newest brightest. */
+.sc-trail { position: absolute; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: var(--color-ink-3); pointer-events: none; transition: opacity var(--duration-slow) ease-out; }
+.sc-trail.is-excl { background: var(--color-crash); }
+
+/* The floating readout for narrow screens */
+.sc-float {
+  position: fixed; left: 50%; bottom: max(1rem, env(safe-area-inset-bottom)); z-index: 45; display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-2) var(--space-5);
+  max-width: calc(100vw - 2rem); white-space: nowrap;
+  border-radius: 999px; background: color-mix(in srgb, var(--color-surface) 94%, transparent); border: 1px solid rgb(var(--gold-rgb) / 0.25); box-shadow: 0 18px 40px -16px rgb(0 0 0 / 0.8);
+  transform: translate(-50%, 140%); opacity: 0; pointer-events: none; transition: transform 500ms var(--ease-out), opacity 300ms ease-out;
+}
+.sc-float.is-on { transform: translate(-50%, 0); opacity: 1; }
+.sc-float-label { color: var(--color-ink-3); font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.sc-float-value { color: var(--color-crash); font-family: var(--font-display); font-size: var(--text-lg); font-variation-settings: "opsz" 6; font-weight: 650; }
+.sc-float-tag { color: var(--color-ink-2); font-size: var(--text-xs); }
+
+@media (max-width: 1099px) {
+  .chapter-block .bk-root.bk-workbench, .chapter-lab .sc-root.sc-workbench { grid-template-columns: minmax(0, 1fr); }
+  .bk-pane-record, .sc-pane-result { position: static; }
+  .bk-record.surface, .sc-panel.surface { max-height: none; overflow: visible; }
+  .bk-pane-list { display: contents; }
+  .bk-workbench .bk-search { order: 1; }
+  .bk-workbench .bk-pane-record { order: 2; }
+  .bk-workbench .bk-rank { order: 3; }
+  .sc-workbench .sc-pane-result { order: -1; }
+}
+@media (max-width: 640px) {
+  .bk-workbench .bk-body { grid-template-columns: minmax(0, 1fr); }
+  .bk-workbench .bk-fact { flex: 1 1 calc(50% - var(--space-2)); min-width: 0; }
+  .bk-workbench .bk-fact-value { white-space: normal; }
+  .bk-workbench .bk-strip { margin-inline: var(--space-2); }
+  .bk-record.surface, .sc-panel.surface { padding: var(--space-4); }
+  .sc-float-label { display: none; }
+  .bk-workbench .bk-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .bk-workbench .bk-rank-list { max-height: 70vh; }
+}
+@media (min-width: 1100px) { .sc-float { display: none; } }
+/* The percentile tag stays inside the strip at its ends: above the 90th it hangs to the left, below the 8th to the right. */
+.bk-light:is([data-travel^="9"]:not([data-travel^="9."]), [data-travel^="100"]) .bk-light-tag { translate: -88% 0; }
+.bk-light:is([data-travel^="0."], [data-travel^="1."], [data-travel^="2."], [data-travel^="3."], [data-travel^="4."], [data-travel^="5."], [data-travel^="6."], [data-travel^="7."]) .bk-light-tag { translate: -12% 0; }
+
+/* Each ranked row carries its crashes as a faint bar that grows in from the left, against the most on the list. */
+.bk-workbench .bk-row::before {
+  content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; z-index: -1; width: calc(var(--w, 0) * 100%); border-radius: 8px;
+  background: linear-gradient(90deg, rgb(var(--crash-rgb) / 0.02), rgb(var(--crash-rgb) / 0.13)); transform-origin: left; transform: scaleX(0);
+  animation: bar-grow 900ms var(--ease-out) forwards; animation-delay: calc(120ms + var(--i, 0) * 30ms);
+}
+@keyframes bar-grow { to { transform: scaleX(1); } }
+.bk-ranked.is-loading .bk-rank-list { opacity: 0.4; filter: saturate(0.5); transition: opacity 200ms ease-out, filter 200ms ease-out; }
+
+/* Test it: every control is a label, a balanced grid of pills and a line of help, at one rhythm. */
+.sc-workbench .sc-control { gap: 0; }
+.sc-workbench .sc-control .segmented-field { display: grid; }
+.sc-workbench .sc-control .field-label { display: flex; align-items: center; gap: var(--space-2); }
+.sc-workbench .sc-control .field-help { margin-top: var(--space-2); }
+#sc-sites, #sc-cluster { --cols: 2; }
+#sc-borough { --cols: 3; }
+#sc-size { --cols: 6; }
+#sc-group { --cols: 2; }
+#sc-cohort { --cols: 4; }
+#sc-group .segment:first-child, #sc-cohort .segment:first-child { grid-column: 1 / -1; }   /* the default on its own row, the variations below it */
+/* A control that differs from the published comparison: a gold mark grows beside its name. */
+.sc-workbench .sc-control .field-label::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary); box-shadow: 0 0 10px 2px rgb(var(--gold-rgb) / 0.6); transform: scale(0); transition: transform 420ms var(--spring); }
+.sc-workbench .sc-control.is-changed .field-label { color: var(--color-accent-strong); }
+.sc-workbench .sc-control.is-changed .field-label::after { transform: scale(1); }
+.sc-workbench .sc-control { position: relative; }
+.sc-workbench .sc-control.is-pulse::before { content: ""; position: absolute; inset: 4px -12px; border-radius: 12px; background: radial-gradient(60% 80% at 50% 50%, rgb(var(--gold-rgb) / 0.08), transparent 70%); pointer-events: none; animation: control-pulse 900ms var(--ease-out) forwards; }
+@keyframes control-pulse { from { opacity: 1; } to { opacity: 0; } }
+
+/* How far from the published answer: an arrow that turns, and the points counted. */
+.sc-delta { display: inline-flex; align-items: baseline; gap: var(--space-2); margin: 0; color: var(--color-ink-2); font-size: var(--text-sm); }
+.sc-delta-arrow { display: inline-block; width: 0.55rem; height: 0.55rem; border-right: 1.75px solid currentColor; border-top: 1.75px solid currentColor; transform: rotate(-45deg) translateY(0.1rem); transition: transform 480ms var(--spring), opacity 200ms ease-out; }
+.sc-delta.is-down .sc-delta-arrow { transform: rotate(135deg) translateY(0.1rem); }
+.sc-delta.is-same .sc-delta-arrow, .sc-delta.is-none .sc-delta-arrow { opacity: 0; width: 0; margin-right: calc(-1 * var(--space-2)); }
+.sc-delta-num { color: var(--color-ink); font-family: var(--font-display); font-size: var(--text-md); font-variation-settings: "opsz" 6; font-weight: 650; font-variant-numeric: tabular-nums; }
+.sc-delta.is-up { color: var(--color-crash-ink); }
+.sc-delta.is-down { color: var(--color-preservation); }
+.sc-workbench .sc-readout { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "value tag" "value delta"; align-items: center; column-gap: var(--space-5); row-gap: var(--space-2); }
+.sc-workbench .sc-value { grid-area: value; }
+.sc-workbench .sc-tag { grid-area: tag; justify-self: end; }
+.sc-workbench .sc-delta { grid-area: delta; justify-self: end; }
+
+@media (max-width: 640px) {
+  #sc-size, #sc-borough { --cols: 3; }
+  #sc-cohort { --cols: 2; }
+  .sc-workbench .sc-readout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "value" "tag" "delta"; }
+  .sc-workbench .sc-tag, .sc-workbench .sc-delta { justify-self: start; }
+}
+/* Type's labels differ in length ("All" against "Preservation"): its cells take their own width and share the rest. */
+#bk-type { grid-template-columns: repeat(3, auto); }
+.bk-filters .segment { padding-inline: var(--space-3); }
+/* The count above the list */
+.bk-summary { display: flex; align-items: baseline; gap: var(--space-2); margin: 0 0 var(--space-2); color: var(--color-ink-3); font-size: var(--text-sm); }
+.bk-summary-num { color: var(--color-ink); font-family: var(--font-display); font-size: var(--text-lg); font-variation-settings: "opsz" 6; font-weight: 650; font-variant-numeric: tabular-nums; }
+.bk-summary.is-new .bk-summary-text { animation: arrive 500ms var(--ease-out); }
+/* On a phone the pill groups take a whole row each, so no label is cut: menus stay two across, pills go full width. */
+@media (max-width: 640px) {
+  .bk-workbench .bk-filters .segmented-field { grid-column: 1 / -1; }
+  #bk-type { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #sc-group { --cols: 1; }
+}

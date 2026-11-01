@@ -84,6 +84,9 @@
   }
   function scrollTo(node) { node.scrollIntoView({ behavior: reduced() ? "auto" : "smooth", block: "start" }); }
   function inView(node) { var box = node.getBoundingClientRect(); return box.top >= 0 && box.top < window.innerHeight * 0.6; }
+  /* Side by side: the tools show their answer in a panel that stays in view, so nothing needs to scroll to it. */
+  var sideBySide = window.matchMedia("(min-width: 1100px)");
+  function wide() { return sideBySide.matches; }
 
   /* ================================================================== YOUR BLOCK */
 
@@ -168,16 +171,32 @@
     function choose(item) {
       closeList();
       if (item.kind === "site") { input.value = item.label; openSite(item.id, true); }
-      else if (item.kind === "zip") { input.value = item.label; openZip(item.id, true); }
+      else if (item.kind === "zip") { input.value = item.label; opened = true; openZip(item.id, true); }
       else { input.value = item.label; ranking.borough = item.id; ranking.offset = 0; syncFilters(); loadRanked(false); setParams({ site: null, zip: null }); clearRecord(); scrollTo(ranked); }
     }
 
     /* ---- the record ---- */
-    function clearRecord() { openSeq++; clear(record); record.classList.remove("is-open"); }
-    function show(node) {
+    function clearRecord() { openSeq++; clear(record); record.classList.remove("is-open"); drawWelcome(); }
+    function drawWelcome() {
+      var box = el("div", "bk-record-inner bk-welcome");
+      box.appendChild(el("p", "bk-welcome-kicker", "The chosen site"));
+      box.appendChild(el("p", "bk-welcome-title", "Pick a site from the list, or search for one"));
+      box.appendChild(el("p", "bk-text", "Its record opens here: where its streets rank in the borough, the crashes around it before it was built, and the sites near it."));
+      clear(record); record.appendChild(box);
+    }
+    var currentSite = null;
+    function markRow() {
+      listEl.querySelectorAll(".bk-row").forEach(function (row) {
+        var mine = currentSite !== null && row.getAttribute("data-site") === String(currentSite);
+        row.classList.toggle("is-selected", mine);
+        if (mine) { row.setAttribute("aria-current", "true"); } else { row.removeAttribute("aria-current"); }
+      });
+    }
+    function show(node, quiet) {
       clear(record); record.appendChild(node); record.classList.add("is-open");
       node.classList.add("bk-enter");
-      if (!inView(record)) { scrollTo(record); }
+      record.scrollTop = 0;
+      if (!quiet && !wide() && !inView(record)) { scrollTo(record); }
       frame(function () { node.classList.add("is-on"); node.querySelectorAll("[data-travel]").forEach(travel); });
     }
     function travel(node) {                                     // a light that runs from the left edge to its place
@@ -217,7 +236,7 @@
     }
     function actions(extraLink) {
       var row = el("div", "bk-actions");
-      var copy = el("button", "button button-secondary magnetic", "Copy link to this view", { type: "button" });
+      var copy = el("button", "button button-secondary", "Copy link to this view", { type: "button" });
       var note = el("span", "visually-hidden", "", { role: "status", "aria-live": "polite" });
       copy.addEventListener("click", function () { copyLink(copy, note); });
       row.appendChild(copy); row.appendChild(note);
@@ -336,7 +355,7 @@
         if (r.nearby_total > r.nearby.length) { nearby.appendChild(el("p", "aside", "and " + num(r.nearby_total - r.nearby.length) + " more nearby.")); }
       } else { nearby.appendChild(el("p", "bk-text", "No other located site is within " + r.buffer_m + " m.")); }
       box.appendChild(nearby);
-      var lab = el("a", "button button-primary magnetic", "Try breaking the result for sites like this", { href: (r.event && r.event.scenario_link) || "#lab" });
+      var lab = el("a", "button button-primary", "Try breaking the result for sites like this", { href: (r.event && r.event.scenario_link) || "#lab" });
       lab.addEventListener("click", function (event) {
         var target = (r.event && r.event.scenario_link) || "#lab";
         if (target.indexOf("?scenario=") === 0) { event.preventDefault(); NYC.setScenario({ sites: "preservation" }); }
@@ -390,7 +409,7 @@
       return box;
     }
 
-    function open(url, render, params, missing) {
+    function open(url, render, params, missing, quiet) {
       var seq = ++openSeq;
       if (openController) { openController.abort(); }
       openController = typeof AbortController === "function" ? new AbortController() : null;
@@ -399,15 +418,16 @@
         if (seq !== openSeq) { return; }
         record.classList.remove("is-loading");
         if (!data) { failure(missing); setParams({ site: null, zip: null }); return; }
-        show(render(data)); setParams(params);
+        currentSite = params.site ? params.site : null; markRow();
+        show(render(data), quiet); if (!quiet) { setParams(params); }
       }).catch(function (error) {
         if (error && error.name === "AbortError") { return; }
         if (seq === openSeq) { record.classList.remove("is-loading"); failure("The record could not be loaded. Try again."); }
       });
     }
-    function openSite(id, fromUser) {
+    function openSite(id, fromUser, quiet) {
       if (fromUser) { setParams({ zip: null }); }
-      return open("/api/block/site?id=" + encodeURIComponent(id), renderSite, { site: String(id), zip: null }, "No located site has that id. Confidential records cannot be looked up.");
+      return open("/api/block/site?id=" + encodeURIComponent(id), renderSite, { site: String(id), zip: null }, "No located site has that id. Confidential records cannot be looked up.", quiet);
     }
     function openZip(code, fromUser) {
       if (fromUser) { setParams({ site: null }); }
@@ -416,29 +436,43 @@
 
     /* ---- the ranked list ---- */
     var ranking = { borough: "all", type: "all", sort: "baseline", dir: "desc", offset: 0, rows: 0 };
+    /* Four equal cells: two menus (many choices) above two pill groups (few choices). */
     var controls = el("div", "bk-filters");
-    function select(idName, labelText, options) {
-      var wrap = el("div", "bk-select");
-      wrap.appendChild(el("label", "field-label", labelText, { for: idName }));
-      var chooser = el("select", "bk-chooser", null, { id: idName });
-      options.forEach(function (option) { chooser.appendChild(el("option", null, option[1], { value: option[0] })); });
-      wrap.appendChild(chooser);
-      controls.appendChild(wrap);
-      return chooser;
-    }
-    var boroughSelect = select("bk-borough", "Borough", [["all", "All boroughs"]].concat((config.boroughs || []).map(function (name) { return [name, name]; })));
-    var typeSelect = select("bk-type", "Type", [["all", "All types"], ["New Construction", "New construction"], ["Preservation", "Preservation"]]);
-    var sortSelect = select("bk-sort", "Sort by", [["baseline", "Crashes nearby"], ["percentile", "Percentile in borough"], ["units", "Units"], ["completion", "Completion year"], ["project", "Project name"]]);
-    var dirButton = el("button", "button button-quiet bk-dir", "Highest first", { type: "button", "aria-pressed": "false" });
-    var dirWrap = el("div", "bk-select"); dirWrap.appendChild(el("span", "field-label", "Order")); dirWrap.appendChild(dirButton); controls.appendChild(dirWrap);
+    var boroughPick = NYC.picker({ id: "bk-borough", label: "Borough", value: ranking.borough,
+      options: [["all", "All boroughs"]].concat((config.boroughs || []).map(function (name) { return [name, name]; })),
+      onChange: function (v) { ranking.borough = v; loadRanked(false); } });
+    var sortPick = NYC.picker({ id: "bk-sort", label: "Sort by", value: ranking.sort,
+      options: [["baseline", "Crashes nearby"], ["percentile", "Percentile in borough"], ["units", "Units"], ["completion", "Completion year"], ["project", "Project name"]],
+      onChange: function (v) { ranking.sort = v; ranking.dir = v === "project" ? "asc" : "desc"; loadRanked(false); } });
+    var typeSeg = NYC.segmented({ id: "bk-type", label: "Type", value: ranking.type, cols: 3,
+      options: [["all", "All"], ["New Construction", "New"], ["Preservation", "Preservation"]],
+      onChange: function (v) { ranking.type = v; loadRanked(false); } });
+    var dirSeg = NYC.segmented({ id: "bk-dir", label: "Order", value: ranking.dir, cols: 2,
+      options: [["desc", "Highest first"], ["asc", "Lowest first"]],
+      onChange: function (v) { ranking.dir = v; loadRanked(false); } });
+    [boroughPick, sortPick, typeSeg, dirSeg].forEach(function (control) { controls.appendChild(control.el); });
     var listEl = el("ol", "bk-rank-list", null, { "aria-label": "Sites on the most crash-heavy streets" });
     var foot = el("div", "bk-rank-foot");
     var total = el("p", "bk-total", "", { role: "status", "aria-live": "polite" });
-    var more = el("button", "button button-primary magnetic", "Show 25 more", { type: "button" });
-    var csv = el("a", "button button-secondary magnetic", "Download CSV", { href: "/block/ranked.csv", download: "sites_on_crash_heavy_streets.csv" });
+    var more = el("button", "button button-primary", "Show 25 more", { type: "button" });
+    var csv = el("a", "button button-secondary", "Download CSV", { href: "/block/ranked.csv", download: "sites_on_crash_heavy_streets.csv" });
     var buttons = el("div", "bk-rank-buttons"); buttons.appendChild(more); buttons.appendChild(csv);
     foot.appendChild(total); foot.appendChild(buttons);
-    ranked.appendChild(controls); ranked.appendChild(listEl); ranked.appendChild(foot);
+    /* Above the rows: how many sites the filters leave, counted as it changes, and the filters in words. */
+    var summary = el("p", "bk-summary", null, { "aria-hidden": "true" });
+    var summaryNum = el("span", "bk-summary-num", "0"), summaryText = el("span", "bk-summary-text", "");
+    summary.appendChild(summaryNum); summary.appendChild(summaryText);
+    var shownTotal = 0, cancelTotal = null;
+    function drawSummary(totalRows) {
+      if (cancelTotal) { cancelTotal(); }
+      cancelTotal = tween(shownTotal, totalRows, 650, function (v) { summaryNum.textContent = num(Math.round(v)); });
+      shownTotal = totalRows;
+      var parts = [ranking.borough === "all" ? "all boroughs" : ranking.borough,
+                   ranking.type === "all" ? "both types" : ranking.type.toLowerCase()];
+      summaryText.textContent = (totalRows === 1 ? " site" : " sites") + " · " + parts.join(" · ");
+      summary.classList.remove("is-new"); void summary.offsetWidth; summary.classList.add("is-new");
+    }
+    ranked.appendChild(controls); ranked.appendChild(summary); ranked.appendChild(listEl); ranked.appendChild(foot);
 
     function query(extra) {
       var parts = ["borough=" + encodeURIComponent(ranking.borough), "type=" + encodeURIComponent(ranking.type),
@@ -446,20 +480,20 @@
       return parts.concat(extra || []).join("&");
     }
     function syncFilters() {
-      boroughSelect.value = ranking.borough; typeSelect.value = ranking.type; sortSelect.value = ranking.sort;
-      dirButton.textContent = ranking.dir === "desc" ? "Highest first" : "Lowest first";
-      dirButton.setAttribute("aria-pressed", ranking.dir === "asc" ? "true" : "false");
+      boroughPick.set(ranking.borough); sortPick.set(ranking.sort); typeSeg.set(ranking.type); dirSeg.set(ranking.dir);
       csv.setAttribute("href", "/block/ranked.csv?" + query());
     }
     function rankRow(row, index) {
-      var li = el("li", "bk-row");
+      var li = el("li", "bk-row", null, { "data-site": String(row.site_id) });
       li.style.setProperty("--i", index);
+      // A bar behind the row: this site's crashes against the most on the list, so the ranking reads at a glance.
+      li.style.setProperty("--w", ranking.top ? Math.max(0.02, Math.min(1, row.baseline_crashes / ranking.top)).toFixed(3) : "0");
       li.appendChild(el("span", "bk-row-rank", String(row.rank)));
       var main = el("div", "bk-row-main");
       var link = el("a", "bk-row-name", row.project, { href: "?site=" + row.site_id + "#block" });
-      link.addEventListener("click", function (event) { event.preventDefault(); openSite(row.site_id, true); scrollTo(record); });
+      link.addEventListener("click", function (event) { event.preventDefault(); openSite(row.site_id, true); });
       main.appendChild(link);
-      main.appendChild(el("span", "bk-row-meta", row.borough + " " + row.zip + ", " + row.type + ", " + num(row.units) + " units, " + (row.completion_year === null ? "completion not recorded" : "completed " + row.completion_year)));
+      main.appendChild(el("span", "bk-row-meta", row.borough + " " + row.zip + " · " + row.type + " · " + num(row.units) + " units · " + (row.completion_year === null ? "completion not recorded" : "completed " + row.completion_year)));
       li.appendChild(main);
       var figure = el("div", "bk-row-fig");
       figure.appendChild(el("span", "bk-row-num", num(row.baseline_crashes)));
@@ -467,7 +501,7 @@
       li.appendChild(figure);
       return li;
     }
-    var rankSeq = 0;
+    var rankSeq = 0, opened = false;
     function loadRanked(append) {
       var seq = ++rankSeq;
       if (!append) { ranking.offset = 0; }
@@ -476,18 +510,22 @@
       return getJSON("/api/block/ranked?" + query(["offset=" + ranking.offset, "limit=25"])).then(function (data) {
         if (seq !== rankSeq || !data) { return; }
         ranked.classList.remove("is-loading");
-        if (!append) { clear(listEl); ranking.rows = 0; }
+        if (!append) {
+          clear(listEl); ranking.rows = 0;
+          ranking.top = data.rows.reduce(function (top, row) { return Math.max(top, row.baseline_crashes || 0); }, 0);
+        }
         data.rows.forEach(function (row, index) { listEl.appendChild(rankRow(row, index)); });
+        markRow();
+        // On arrival the record panel shows the top site, so the panel is never empty and the reader sees what a
+        // record holds before choosing. The address is left alone: nothing was chosen yet.
+        if (!append && !opened && data.rows.length) { opened = true; openSite(data.rows[0].site_id, false, true); }
         ranking.rows += data.rows.length; ranking.offset = ranking.rows;
         total.textContent = data.total ? "Showing " + num(ranking.rows) + " of " + num(data.total) + " sites with a crash baseline." : "No site matches these filters.";
+        if (!append) { drawSummary(data.total || 0); }
         more.hidden = !data.has_more;
         more.textContent = "Show " + Math.min(25, data.total - ranking.rows) + " more";
       }).catch(function () { ranked.classList.remove("is-loading"); total.textContent = "The list could not be loaded. Try again."; });
     }
-    boroughSelect.addEventListener("change", function () { ranking.borough = boroughSelect.value; loadRanked(false); });
-    typeSelect.addEventListener("change", function () { ranking.type = typeSelect.value; loadRanked(false); });
-    sortSelect.addEventListener("change", function () { ranking.sort = sortSelect.value; ranking.dir = sortSelect.value === "project" ? "asc" : "desc"; loadRanked(false); });
-    dirButton.addEventListener("click", function () { ranking.dir = ranking.dir === "desc" ? "asc" : "desc"; loadRanked(false); });
     more.addEventListener("click", function () { loadRanked(true); });
     syncFilters();
     loadRanked(false);
@@ -495,8 +533,9 @@
     /* ---- a shared link opens its record ---- */
     var siteParam = getParam("site"), zipParam = getParam("zip");
     var started = null;
-    if (siteParam) { started = openSite(siteParam, false); }
-    else if (zipParam) { started = openZip(zipParam, false); }
+    drawWelcome();
+    if (siteParam) { opened = true; started = openSite(siteParam, false); }
+    else if (zipParam) { opened = true; started = openZip(zipParam, false); }
     if (started && !window.location.hash && !getParam("scenario")) { started.then(function () { scrollTo(root); }); }
   }
 
@@ -540,6 +579,33 @@
     axisEl.appendChild(plot);
     place(barRef, published.low, published.high); dotRef.style.left = pos(published.estimate) + "%";
 
+    /* Every scenario tried leaves a faint mark on the axis, so the reader sees how far the answer has wandered. */
+    var trail = [], TRAIL = 12;
+    function drawTrail(result) {
+      if (result.status !== "ok") { return; }
+      var mark = el("span", "sc-trail" + (result.excludes_zero ? " is-excl" : ""));
+      mark.style.left = pos(result.estimate) + "%";
+      trackNow.insertBefore(mark, trackNow.firstChild);
+      trail.push(mark);
+      while (trail.length > TRAIL) { trail.shift().remove(); }
+      trail.forEach(function (node, k) { node.style.opacity = (0.15 + 0.5 * (k + 1) / trail.length).toFixed(2); });
+    }
+
+    /* On a narrow screen the answer sits above the choices; a small readout floats at the foot while it is out of view. */
+    var floatEl = document.getElementById("sc-float"), panelEl = root.querySelector(".sc-panel"), labInView = false, panelInView = true;
+    function drawFloat(result) {
+      if (!floatEl) { return; }
+      clear(floatEl);
+      floatEl.appendChild(el("span", "sc-float-label", "This scenario"));
+      floatEl.appendChild(el("span", "sc-float-value" + (result.status === "ok" && result.excludes_zero ? " is-excl" : ""), result.status === "ok" ? signed(result.estimate) + "%" : "No estimate"));
+      floatEl.appendChild(el("span", "sc-float-tag", result.status !== "ok" ? "too few sites" : result.excludes_zero ? "excludes zero" : "cannot be told from zero"));
+    }
+    function placeFloat() { if (floatEl) { floatEl.classList.toggle("is-on", !wide() && labInView && !panelInView); } }
+    if ("IntersectionObserver" in window && floatEl && panelEl) {
+      new IntersectionObserver(function (entries) { labInView = entries[0].isIntersecting; placeFloat(); }).observe(root);
+      new IntersectionObserver(function (entries) { panelInView = entries[0].isIntersecting; placeFloat(); }, { threshold: 0.35 }).observe(panelEl);
+    }
+
     var level = reference.level_text || "95%";
     var state = { spec: Object.assign({}, defaults), past: [], history: [], tried: {}, tries: 0, excluding: 0, shown: published.estimate, last: null, seq: 0, controller: null, cancel: null, drawn: null };
     var syncing = false;
@@ -582,6 +648,35 @@
     function updateButtons() {
       backBtn.disabled = !state.past.length;
       resetBtn.disabled = isDefault(state.spec);
+      // Each control that differs from the published comparison carries a gold mark beside its name.
+      KEYS.forEach(function (k) {
+        var g = group(k), control = g && g.closest(".sc-control");
+        if (control) { control.classList.toggle("is-changed", state.spec[k] !== defaults[k]); }
+      });
+    }
+    function pulse(key) {
+      var g = group(key), control = g && g.closest(".sc-control");
+      if (!control || reduced()) { return; }
+      control.classList.remove("is-pulse"); void control.offsetWidth; control.classList.add("is-pulse");
+    }
+
+    /* How far this scenario sits from the published answer, in points, counted as it changes. */
+    var deltaEl = el("p", "sc-delta", "", { "aria-hidden": "true" });
+    var deltaArrow = el("span", "sc-delta-arrow"), deltaNum = el("span", "sc-delta-num"), deltaText = el("span", "sc-delta-text");
+    deltaEl.appendChild(deltaArrow); deltaEl.appendChild(deltaNum); deltaEl.appendChild(deltaText);
+    if (tagEl && tagEl.parentNode) { tagEl.parentNode.insertBefore(deltaEl, tagEl.nextSibling); }
+    var shownDelta = 0, cancelDelta = null;
+    function drawDelta(result) {
+      if (cancelDelta) { cancelDelta(); }
+      if (result.status !== "ok") { deltaEl.className = "sc-delta is-none"; deltaNum.textContent = ""; deltaText.textContent = "No estimate to compare"; return; }
+      var diff = result.estimate - published.estimate;
+      if (result.is_default || Math.abs(diff) < 0.05) {
+        deltaEl.className = "sc-delta is-same"; deltaNum.textContent = ""; deltaText.textContent = "The published result"; shownDelta = 0; return;
+      }
+      deltaEl.className = "sc-delta " + (diff > 0 ? "is-up" : "is-down");
+      deltaText.textContent = diff > 0 ? " points above published" : " points below published";
+      cancelDelta = tween(shownDelta, Math.abs(diff), 700, function (v) { deltaNum.textContent = v.toFixed(1); });
+      shownDelta = Math.abs(diff);
     }
 
     /* the big figure counts to the new estimate; the axis slides; the ghost stays where it was */
@@ -635,7 +730,8 @@
         });
         emptyEl.appendChild(row);
       }
-      moveBar(result); describeAxis(result);
+      moveBar(result); describeAxis(result); drawTrail(result); drawFloat(result); drawDelta(result);
+      if (panelEl && !reduced()) { panelEl.classList.remove("is-fresh"); void panelEl.offsetWidth; panelEl.classList.add("is-fresh"); }
       statusEl.textContent = ok ? "Estimate " + signed(result.estimate) + " percent. " + (result.excludes_zero ? "Excludes zero." : "Cannot be told from no change.") : "No estimate for this choice.";
       state.last = result;
     }
@@ -703,6 +799,8 @@
 
     root.addEventListener("change", function (event) {
       if (syncing || !event.target || event.target.type !== "radio") { return; }
+      var g = event.target.closest(".segmented");
+      if (g && g.id) { pulse(g.id.replace(/^sc-/, "")); }
       setSpec(readSpec(), true);
     });
     backBtn.addEventListener("click", function () { if (state.past.length) { setSpec(state.past.pop(), false); } });

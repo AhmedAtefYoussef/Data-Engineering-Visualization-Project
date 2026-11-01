@@ -8,14 +8,22 @@
 
    Real steps of the work are named as it runs. Dash's own `running` state on #report (class is-loading) says
    when the work starts and ends; a short minimum keeps the sequence readable even when the answer is instant.
-   Not shown for the report drawn on page load. Under reduced motion it is a plain notice with a bar. */
+   Not shown for the report drawn on page load. Under reduced motion it is a plain notice with a bar.
+
+   Smoothness: the canvas paints its own dark ground and opens the closing circle itself (a destination-out fill),
+   so the browser never animates a full-screen CSS mask beside it; the canvas is held to 1.5 device pixels; the
+   page moves to the report while it is still fully covered, and the circle starts opening two frames later, once
+   that layout has been paid for. And the work itself waits for the calm: a click on Generate is held back until
+   the city has formed (RELEASE_MS), then passed on to Dash, so the few hundred milliseconds in which the new
+   charts are built fall in the steady sweep, not in the middle of the swirl. */
 (function () {
   "use strict";
 
   var NYC = window.NYC;
-  var MIN_MS = 3000, STEP_MS = 720, MAX_WAIT_MS = 15000, OUT_MS = 950, POLL_MS = 80, SPARK = 12, RINGS = 7;
+  var RELEASE_MS = 1750, passing = false;
+  var MIN_MS = 3200, STEP_MS = 720, MAX_WAIT_MS = 15000, OUT_MS = 950, POLL_MS = 80, SPARK = 12, RINGS = 7, MAX_POINTS = 5200, MAX_SCALE = 1.5;
   var TONES = [[95, 212, 196], [232, 192, 116], [255, 143, 120], [255, 240, 205]];
-  var armed = false, overlay = null, raf = 0, startedAt = 0, finishing = false, done = false, fallback = 0, poll = 0, leftAt = 0;
+  var armed = false, overlay = null, raf = 0, startedAt = 0, finishing = false, done = false, fallback = 0, poll = 0, leftAt = 0, opening = 0;
 
   function steps() {
     var facts = document.getElementById("facts"), d = facts ? facts.dataset : {};
@@ -39,7 +47,7 @@
   /* One record per building: where it starts, where it lands in the city, and its own timing. */
   function cloud(width, height) {
     var data = NYC.Stage && NYC.Stage.data, out = [], i;
-    var n = data ? data.n : 2400, lonMax = 1, latMax = 1, aspect = 0.82;
+    var n = data ? data.n : 2400, lonMax = 1, latMax = 1, aspect = 0.82, stride = Math.max(1, n / MAX_POINTS);
     if (data) {
       for (i = 0; i < n; i++) { lonMax = Math.max(lonMax, data.lon[i]); latMax = Math.max(latMax, data.lat[i]); }
       var midLat = (data.origin[1] + latMax / 2) / data.scale;
@@ -47,7 +55,8 @@
     }
     var drawH = Math.min(height * 0.72, width * 0.9 / aspect), drawW = drawH * aspect;
     var left = (width - drawW) / 2, top = height * 0.42 - drawH / 2;
-    for (i = 0; i < n; i++) {
+    for (var k = 0; k < n; k += stride) {
+      i = Math.floor(k);
       var angle = Math.random() * 6.283, spread = Math.random();
       out.push({
         sx: width * Math.random(), sy: height * Math.random(),
@@ -64,7 +73,7 @@
 
   function open() {
     if (overlay) { return; }
-    done = finishing = false; leftAt = 0;
+    done = finishing = false; leftAt = 0; opening = 0;
     startedAt = performance.now();
     overlay = document.createElement("div");
     overlay.className = "gen";
@@ -85,10 +94,14 @@
     document.documentElement.style.overflow = "hidden";
 
     var reduced = NYC.reducedMotion(), texts = steps(), stepShown = 0;
-    var context = canvas.getContext("2d"), width = window.innerWidth, height = window.innerHeight, scale = Math.min(window.devicePixelRatio || 1, 2);
+    var context = canvas.getContext("2d"), width = window.innerWidth, height = window.innerHeight, scale = Math.min(window.devicePixelRatio || 1, MAX_SCALE);
     canvas.width = width * scale; canvas.height = height * scale;
     context.scale(scale, scale);
     var sprites = TONES.map(sprite), city = reduced ? null : cloud(width, height), rings = [];
+    // The ground: the page colour with a faint glow behind the city, painted by the canvas on every frame.
+    var ground = context.createRadialGradient(width / 2, height * 0.42, 0, width / 2, height * 0.42, Math.max(width, height) * 0.7);
+    ground.addColorStop(0, "#10162b"); ground.addColorStop(1, "#0a0d1a");
+    if (city) { overlay.classList.add("is-canvas"); }
     var GATHER_FROM = 450, GATHER_MS = 1500, SCAN_FROM = 1700, SCAN_MS = 1500;
 
     function frame(now) {
@@ -101,7 +114,8 @@
       }
       bar.firstChild.style.setProperty("--p", Math.min(done ? 1 : 0.94, elapsed / MIN_MS).toFixed(3));
       if (city) {
-        context.clearRect(0, 0, width, height);
+        context.globalCompositeOperation = "source-over";
+        context.fillStyle = ground; context.fillRect(0, 0, width, height);
         context.globalCompositeOperation = "lighter";
         var gather = (elapsed - GATHER_FROM) / GATHER_MS, scan = ((elapsed - SCAN_FROM) % SCAN_MS) / SCAN_MS;
         var scanning = elapsed > SCAN_FROM, scanY = city.top - 30 + scan * (city.bottom - city.top + 60);
@@ -142,6 +156,16 @@
           context.beginPath(); context.arc(ring.x, ring.y, 4 + age * 26, 0, 6.283); context.stroke();
           return true;
         });
+        if (opening) {
+          // The circle that opens onto the report, cut out of the canvas itself.
+          var hole = NYC.easeInOut(Math.min(1, (now - opening) / OUT_MS)) * Math.hypot(width, height) * 0.62;
+          context.globalCompositeOperation = "destination-out";
+          var edge = context.createRadialGradient(width / 2, height * 0.42, Math.max(0, hole - 40), width / 2, height * 0.42, hole + 1);
+          edge.addColorStop(0, "rgba(0,0,0,1)"); edge.addColorStop(1, "rgba(0,0,0,0)");
+          context.fillStyle = edge;
+          context.beginPath(); context.arc(width / 2, height * 0.42, hole + 1, 0, 6.283); context.fill();
+          context.globalCompositeOperation = "source-over";
+        }
       }
       if (overlay) { raf = window.requestAnimationFrame(frame); }
     }
@@ -155,28 +179,39 @@
     if (!done || finishing || performance.now() - startedAt < MIN_MS) { return; }
     finishing = true;
     window.clearInterval(poll);
-    leftAt = performance.now();
-    var leaving = overlay;
-    leaving.classList.add("is-out");
-    window.setTimeout(function () {
-      var target = document.getElementById("report");
-      if (target) { target.scrollIntoView({ block: "start", behavior: "instant" }); }
-      document.documentElement.style.overflow = "";
-      document.querySelectorAll(".tile, .figures .metric, .card").forEach(function (element, index) { element.style.setProperty("--i", index % 8); });
-      document.body.setAttribute("data-report", "fresh");
-      window.setTimeout(function () { document.body.removeAttribute("data-report"); }, 2400);
-    }, NYC.reducedMotion() ? 0 : 120);
-    window.setTimeout(function () {
-      window.cancelAnimationFrame(raf);
-      leaving.remove();
-      overlay = null;
-    }, NYC.reducedMotion() ? 0 : OUT_MS);
+    var leaving = overlay, reducedNow = NYC.reducedMotion();
+    // 1. While the screen is still covered: move to the report and let the browser lay it out.
+    var target = document.getElementById("report");
+    document.documentElement.style.overflow = "";
+    if (target) { target.scrollIntoView({ block: "start", behavior: "instant" }); }
+    document.querySelectorAll(".tile, .figures .metric, .card").forEach(function (element, index) { element.style.setProperty("--i", index % 8); });
+    // 2. Two frames later, the city rushes outward and the circle opens.
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(function () {
+        leftAt = opening = performance.now();
+        leaving.classList.add("is-out");
+        document.body.setAttribute("data-report", "fresh");
+        window.setTimeout(function () { document.body.removeAttribute("data-report"); }, 2400);
+        window.setTimeout(function () {
+          window.cancelAnimationFrame(raf);
+          leaving.remove();
+          overlay = null;
+        }, reducedNow ? 0 : OUT_MS + 40);
+      });
+    });
   }
 
   /* The reader asked: from the button, or Enter in the search box. */
-  document.addEventListener("click", function (event) {
-    if (event.target.closest && event.target.closest("#generate")) { armed = true; open(); }
-  });
+  // Capture on the window runs before React's own listener, so the click can be held and passed on later.
+  window.addEventListener("click", function (event) {
+    var button = event.target.closest && event.target.closest("#generate");
+    if (!button || passing) { return; }
+    armed = true;
+    if (NYC.reducedMotion() || button.disabled || overlay) { open(); return; }
+    event.stopImmediatePropagation(); event.preventDefault();
+    open();
+    window.setTimeout(function () { passing = true; button.click(); passing = false; }, RELEASE_MS);
+  }, true);
   document.addEventListener("keydown", function (event) {
     if (event.key === "Enter" && event.target.id === "search") { armed = true; open(); }
   });
