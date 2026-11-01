@@ -14,8 +14,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      # The site's packages plus the test and lint tools and scipy (the raw-data checks use it); the other notebook-only libraries are not needed.
-      - run: pip install -r requirements.txt pytest pytest-cov ruff scipy
+      # The site's packages plus the test and lint tools, scipy (the raw-data checks use it) and jupytext, nbformat and nbclient (the pipeline tests load the build script); the other notebook-only libraries are not needed.
+      - run: pip install -r requirements.txt pytest pytest-cov ruff scipy jupytext nbformat nbclient
       - run: ruff check app tests tools
       # The floor sits just under the measured 98 percent; raise it when coverage rises.
       - run: python -m pytest -q tests --cov=app --cov-report=term-missing:skip-covered --cov-fail-under=97

@@ -13,7 +13,6 @@ from app import charts, components, story
 from app.data import Store
 from app.filters import (BOROUGHS, CONSTRUCTION_TYPES, DEFAULT_HARM, DEFAULT_SCOPE, FACTOR_GROUPS, HARM,
                          HOUR_BAND_RANGES, HOUR_BANDS, SCOPE, SIZE_BANDS, YEAR_END, YEAR_START, YEARS)
-from app.report import CHART_KEYS
 from app.theme import GRAPH_CONFIG
 
 log = logging.getLogger(__name__)

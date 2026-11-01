@@ -32,10 +32,12 @@ def test_default_spec_reproduces_rq3_exactly(store):
     result = scenarios.run(store, scenarios.DEFAULT_SPEC)
     published = store.results["questions"]["RQ3"]
     assert result["status"] == "ok" and result["is_default"]
-    assert (result["estimate"], result["low"], result["high"]) == (published["estimate"], published["low"], published["high"])
+    # Recomputed, not read back: the last digit can differ between the machine that built the data and this one.
+    assert (result["estimate"], result["low"], result["high"]) == pytest.approx(
+        (published["estimate"], published["low"], published["high"]), rel=1e-12)
     assert result["n_tested_sites"] == published["n"]
     detail = store.results["detail"]["rq3_did"]
-    assert result["p_value"] == detail["p_value"]
+    assert result["p_value"] == pytest.approx(detail["p_value"], rel=1e-12)
     assert result["n_comparison_sites"] == detail["n_comparison_sites"]
     assert result["n_comparison_rows"] == detail["n_control"]
     assert result["n_clusters"] == detail["n_clusters"]
@@ -56,14 +58,16 @@ def test_each_comparison_group_matches_its_robustness_row(store, group, variant)
     assert result["n_comparison_sites"] == row["n_comparison_sites"]
     assert result["n_clusters"] == row["n_resampled_units"]
     assert result["n_tested_clusters"] == row["n_treated_clusters"]
-    assert (result["estimate"], result["low"], result["high"]) == (row["percent_change"], row["percent_low"], row["percent_high"])
+    assert (result["estimate"], result["low"], result["high"]) == pytest.approx(
+        (row["percent_change"], row["percent_low"], row["percent_high"]), rel=1e-12)
     assert result["excludes_zero"] == row["interval_excludes_zero"]
 
 
 def test_leaving_out_a_cohort_matches_its_robustness_row(store):
     result, row = scenarios.run(store, {"cohort": "2019"}), _row(store, "Without the 2019 cohort")
     assert (result["n_tested_sites"], result["n_comparison_rows"]) == (row["n_treated"], row["n_comparison"])
-    assert (result["estimate"], result["low"], result["high"]) == (row["percent_change"], row["percent_low"], row["percent_high"])
+    assert (result["estimate"], result["low"], result["high"]) == pytest.approx(
+        (row["percent_change"], row["percent_low"], row["percent_high"]), rel=1e-12)
 
 
 def test_a_result_that_excludes_zero_is_labelled_an_unadjusted_association(store):

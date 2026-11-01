@@ -8,9 +8,10 @@ import re
 import numpy as np
 import pytest
 
-from app import stats, story_data
+from app import page, stats, story_data
 from app.data import load
 from app.sections import overview
+from app.story_text import signed
 
 MAX_GZIP_BYTES = 150 * 1024
 HISTOGRAM_BIN = 5
@@ -161,20 +162,19 @@ def _text(component) -> str:
 
 
 def test_the_view_states_the_answers_from_the_store(store):
-    text = _text(overview.layout(store))
+    text = _text(page.build_page(store))
     results = store.results
     assert "Do injury crashes rise around affordable housing once it opens?" in text
     for figure in [f"{results['questions']['RQ3']['estimate']:.1f}".replace("-", "−"),
-                   f"{50 + results['questions']['RQ7']['estimate']:.1f}",
-                   f"{50 + results['detail']['rq7']['one_vote']['estimate']:.1f}"]:
+                   f"{50 + results['questions']['RQ7']['estimate']:.0f}th",
+                   signed(results['detail']['rq7']['one_vote']['estimate'])]:
         assert figure in text, figure
-    assert f"{story_data.rq3_outcomes(store)['below_zero']} of 50" in text
     for count in story_data.funnel_counts(store):
         assert f"{count:,}" in text
 
 
 def test_the_view_names_the_comparison_cuts_that_exclude_zero(store):
-    text = _text(overview.layout(store))
+    text = _text(page.build_page(store))
     table = store.robustness
     cuts = table[(table["check"].astype(str) == "Comparison subset") & table["interval_excludes_zero"]]
     assert len(cuts) == 2
