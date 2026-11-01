@@ -70,11 +70,14 @@
     var sprites = TONES.map(sprite);
     var scale = 1, current = null, from = null, to = null, startedAt = 0, seeds = null, visible = true;
     var pointerX = 0, pointerY = 0, driftX = 0, driftY = 0;
-    var intro = true, running = false, marks = [], oldMarks = [], marksIn = 1, lastDrawn = 0;
+    // On a phone (NYC.lite) the canvas draws at one device pixel, skips the light-up intro and draws only while the
+    // points travel, so it never competes with the reader's scrolling.
+    var lite = NYC.lite && NYC.lite();
+    var intro = !lite, running = false, marks = [], oldMarks = [], marksIn = 1, lastDrawn = 0;
     var markLayer = document.createElement("canvas"), oldLayer = document.createElement("canvas");
 
     function resize() {
-      scale = Math.min(window.devicePixelRatio || 1, MAX_SCALE);
+      scale = lite ? 1 : Math.min(window.devicePixelRatio || 1, MAX_SCALE);
       Stage.width = host.clientWidth; Stage.height = host.clientHeight;
       canvas.width = Math.round(Stage.width * scale); canvas.height = Math.round(Stage.height * scale);
       if (!Stage.data) { return; }
@@ -157,9 +160,24 @@
 
       context.setTransform(scale, 0, 0, scale, 0, 0);
       context.clearRect(0, 0, Stage.width, Stage.height);
-      context.globalCompositeOperation = "lighter";
       var introT = intro && !reduced ? Math.min(1, (now - seeds.start) / INTRO_MS) : 1;
       var city = Stage.layoutName === "city", tones = current.tone || Stage.data.new;
+      if (lite) {
+        // On a phone each point is a small square of its colour, drawn one colour at a time: no scaled sprites and
+        // no additive blending, which are the costly parts of a frame without a fast graphics processor.
+        context.globalCompositeOperation = "source-over";
+        for (var tone = 0; tone < TONES.length; tone++) {
+          context.fillStyle = "rgb(" + TONES[tone].join(",") + ")";
+          for (i = 0; i < n; i++) {
+            if (tones[i] !== tone || current.alpha[i] <= 0.01) { continue; }
+            var side = (current.size ? current.size[i] : seeds.size[i]) * 0.42;
+            context.globalAlpha = current.alpha[i];
+            context.fillRect(current.x[i] - side / 2, current.y[i] - side / 2, side, side);
+          }
+        }
+        n = 0;                                      // the sprite loop below has nothing left to draw
+      }
+      context.globalCompositeOperation = "lighter";
       for (i = 0; i < n; i++) {
         var a = current.alpha[i];
         if (a <= 0.01) { continue; }
@@ -168,9 +186,9 @@
         // Lights come on across the city, each with a brief flare. Buildings with more homes burn a little larger.
         var flare = introT < 1 ? 1 + (1 - shown) * 1.6 : 1;
         var size = (current.size ? current.size[i] : seeds.size[i]) * flare;
-        var twinkle = reduced ? 1 : 0.86 + 0.14 * Math.sin(now * seeds.rate[i] + seeds.phase[i]);
+        var twinkle = reduced || lite ? 1 : 0.86 + 0.14 * Math.sin(now * seeds.rate[i] + seeds.phase[i]);
         // In a chart the points breathe in place, a pixel at most, so the chart stays exact but alive.
-        var float = !reduced && settled && !city ? Math.sin(now * seeds.rate[i] * 0.7 + seeds.phase[i]) * 0.8 : 0;
+        var float = !reduced && !lite && settled && !city ? Math.sin(now * seeds.rate[i] * 0.7 + seeds.phase[i]) * 0.8 : 0;
         context.globalAlpha = a * shown * twinkle;
         context.drawImage(sprites[tones[i]], current.x[i] + driftX - size / 2, current.y[i] + driftY + float - size / 2, size, size);
       }
@@ -178,7 +196,7 @@
       if (oldMarks.length) { stamp(oldLayer, 1 - Math.min(1, (now - startedAt) / FADE_MS)); }
       stamp(markLayer, marksIn);
       if (introT >= 1) { intro = false; }
-      if (more || intro || (visible && !reduced)) { kick(); }
+      if (more || intro || (visible && !reduced && !lite)) { kick(); }
     }
     function kick() { if (running || !visible) { return; } running = true; window.requestAnimationFrame(draw); }
 

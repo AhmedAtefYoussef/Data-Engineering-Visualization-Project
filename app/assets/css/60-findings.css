@@ -167,7 +167,7 @@
 .md-head { position: absolute; top: 50%; left: calc(var(--p) * 100%); width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--color-accent-strong); box-shadow: 0 0 22px 7px rgb(var(--gold-rgb) / 0.6); }
 .md-stages { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-7); }
 .md-stage { position: relative; padding-top: var(--space-6); transition: opacity 700ms var(--ease-out); }
-.md-journey.is-live .md-stage:not(.is-lit) { opacity: 0.32; }
+.md-journey.is-live .md-stage:not(.is-lit) { opacity: 0.75; }   /* dimmed, still readable: 4.5:1 or more */
 .md-node { position: absolute; left: 0; top: 0; width: 18px; height: 18px; border-radius: 50%; background: var(--tint); border: 2px solid var(--color-line-strong); transition: background-color 500ms ease-out, border-color 500ms ease-out, box-shadow 700ms ease-out; }
 .md-journey:not(.is-live) .md-node, .md-stage.is-lit .md-node { background: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 22px 3px rgb(var(--gold-rgb) / 0.55); }
 .md-stage h4 { font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); line-height: 1.1; letter-spacing: -0.015em; }

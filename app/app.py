@@ -17,7 +17,7 @@ import os
 import dash
 from flask import Response, request
 
-from app import data, page
+from app import data, lazy, page
 from app.filters import YEAR_END, YEAR_START
 from app.layout import missing_data_layout
 from app.report import GEOJSON_URL
@@ -90,7 +90,7 @@ app.index_string = """<!DOCTYPE html>
 </head>
 <body>
 {%app_entry%}
-<footer>{%config%}{%scripts%}{%renderer%}</footer>
+<div class="dash-scripts">{%config%}{%scripts%}{%renderer%}</div>
 </body>
 </html>"""
 
@@ -143,8 +143,11 @@ except FileNotFoundError as error:
     log.warning("%s", error)
     app.layout = missing_data_layout(str(error))
 else:
-    app.layout = page.build_page(STORE)
+    full_page = page.build_page(STORE)
+    app.layout, deferred, lazy_stores = lazy.defer(full_page)
+    app.validation_layout = dash.html.Div([full_page, *lazy_stores])   # callbacks are checked against every part
     page.register(app, STORE)
+    lazy.register(app, deferred)
     server.add_url_rule(GEOJSON_URL, "crash_grid", _serve_grid(STORE))
     log.info("data loaded: %s crashes, %s housing rows, built %s",
              f"{STORE.meta['rows']['crashes']:,}", f"{STORE.meta['rows']['housing']:,}", STORE.meta["built_at"])

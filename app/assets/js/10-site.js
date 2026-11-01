@@ -37,8 +37,16 @@
   }
 
     var scheduled = false;
+  // 3. A chosen value in a multi-select dropdown is drawn with role="option" but outside any listbox, which screen
+  //    readers cannot place (WCAG 1.3.1). It is a label of the control's value, so the role is removed.
+  function unroleValues() {
+    document.querySelectorAll(".dash-dropdown .Select-value [role='option'], .dash-dropdown [id$='--value-item'][role='option']")
+      .forEach(function (item) { item.removeAttribute("role"); item.removeAttribute("aria-selected"); item.removeAttribute("aria-disabled"); });
+  }
+
   function refresh() {
     scheduled = false;
+    unroleValues();
     nameComboboxes();
     freeTouchScroll();
   }

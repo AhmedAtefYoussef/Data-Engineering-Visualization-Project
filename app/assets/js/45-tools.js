@@ -602,7 +602,9 @@
     }
     function placeFloat() { if (floatEl) { floatEl.classList.toggle("is-on", !wide() && labInView && !panelInView); } }
     if ("IntersectionObserver" in window && floatEl && panelEl) {
-      new IntersectionObserver(function (entries) { labInView = entries[0].isIntersecting; placeFloat(); }).observe(root);
+      // Only while the choices cross the middle of the screen, so the readout never lies over the next section.
+      new IntersectionObserver(function (entries) { labInView = entries[0].isIntersecting; placeFloat(); },
+                               { rootMargin: "-35% 0px -35% 0px" }).observe(root.querySelector(".sc-pane-controls") || root);
       new IntersectionObserver(function (entries) { panelInView = entries[0].isIntersecting; placeFloat(); }, { threshold: 0.35 }).observe(panelEl);
     }
 

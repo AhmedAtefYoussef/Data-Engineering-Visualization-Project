@@ -134,7 +134,7 @@ def _robustness(store: Store) -> html.Div:
         # A forest plot needs width for its row labels: on a phone it scrolls sideways inside its own box.
         components.surface(html.Div(components.graph("fd-robustness", charts.robustness_figure(store.robustness),
                                                      size_class="graph-forest"),
-                                    className="scroll-x", tabIndex=0, role="region",
+                                    className="scroll-x", tabIndex=0, role="region", **{"data-lazy": "lazy-robustness"},
                                     **{"aria-label": "Chart of the main result under each change of method"}),
                            class_name="fd-chart lift"),
         html.P(story.robustness_chart_note(store), className="fd-note lift"),
