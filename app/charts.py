@@ -33,6 +33,11 @@ FOREST_LABEL_WIDTH = 44            # characters per line of a row label, so the 
 def _figure(**layout) -> go.Figure:
     figure = go.Figure()
     figure.update_layout(template=TEMPLATE, **layout)
+    # Warm text on the dark ground: axis titles in warm white, ticks one step softer, a quiet grid.
+    figure.update_xaxes(tickfont={"color": COLOR["ink-2"]}, title_font={"color": COLOR["ink"]},
+                        gridcolor="rgba(246,242,233,0.07)")
+    figure.update_yaxes(tickfont={"color": COLOR["ink-2"]}, title_font={"color": COLOR["ink"]},
+                        gridcolor="rgba(246,242,233,0.07)")
     return figure
 
 
@@ -45,7 +50,7 @@ def empty_figure(message: str) -> go.Figure:
     """A blank plot of the usual size with one centred sentence explaining what is missing."""
     figure = _figure(xaxis={"visible": False}, yaxis={"visible": False})
     figure.add_annotation(text=message, x=0.5, y=0.5, xref="paper", yref="paper", showarrow=False,
-                          font={"size": 14, "color": COLOR["ink-3"]}, align="center")
+                          font={"size": 15, "color": COLOR["ink-2"]}, align="center")
     return figure
 
 
@@ -63,7 +68,7 @@ def map_figure(cells: pd.DataFrame, sites: pd.DataFrame, crash_noun: str, geojso
             zmin=0, zmax=cap, colorscale=SEQUENTIAL, marker={"opacity": 0.72, "line": {"width": 0}},
             colorbar={"title": {"text": "Crashes per<br>500 m cell", "font": {"size": 12}}, "thickness": 10,
                       "lenmode": "pixels", "len": COLORBAR_LENGTH, "x": 0.99, "xanchor": "right", "y": 0.08, "yanchor": "bottom",
-                      "bgcolor": _rgba(COLOR["surface"], 0.9), "tickfont": {"size": 11}, "outlinewidth": 0},
+                      "bgcolor": _rgba(COLOR["surface"], 0.85), "tickfont": {"size": 11, "color": COLOR["ink"]}, "outlinewidth": 0},
             hovertemplate="%{z:,} " + crash_noun + "<br>in this 500 m cell<extra></extra>",
             name="Crash density", showlegend=False))
     if len(sites):
@@ -76,15 +81,13 @@ def map_figure(cells: pd.DataFrame, sites: pd.DataFrame, crash_noun: str, geojso
                 continue
             part = sites[rows]
             figure.add_trace(go.Scattermap(
-                # five decimals is about one metre and keeps the response small
-                lat=part["lat"].astype(float).round(5), lon=part["lon"].astype(float).round(5),
+                # four decimals is about eleven metres, a third of a pixel at borough zoom, and keeps the
+                # response small. No per-site hover strings travel with the figure: dot size shows the units.
+                lat=part["lat"].astype(float).round(4), lon=part["lon"].astype(float).round(4),
                 mode="markers", name=f"{kind} ({int(rows.sum()):,})",
-                marker={"size": sizes[rows].round(1), "color": color, "opacity": 0.75},
-                customdata=np.column_stack([part["project_name"], part["total_units"],
-                                            part["affordable_units"], part["completion_year"].astype(int),
-                                            part["size_band"].astype(str)]),
-                hovertemplate=("<b>%{customdata[0]}</b><br>" + kind + ", completed %{customdata[3]}<br>"
-                               "%{customdata[1]} units (%{customdata[2]} affordable)<extra></extra>")))
+                marker={"size": sizes[rows].round(0).astype(int), "color": color, "opacity": 0.8},
+                hovertemplate="<b>" + kind + "</b><br>An affordable-housing building. A larger dot means more units."
+                              "<extra></extra>"))
     center, zoom = NYC_CENTER, CITY_ZOOM
     points = sites if len(sites) else cells
     if zoom_to_selection and len(points):
@@ -96,7 +99,7 @@ def map_figure(cells: pd.DataFrame, sites: pd.DataFrame, crash_noun: str, geojso
         modebar={"remove": ["pan", "lasso", "select"]},      # the map keeps its zoom buttons (wheel zoom is off)
         legend={"y": 0.99, "yanchor": "top", "x": 0.01, "bgcolor": _rgba(COLOR["surface"], 0.9),
                 "bordercolor": COLOR["line"], "borderwidth": 1, "orientation": "v",
-                "title": {"text": "Housing sites (size = units)", "font": {"size": 12}}})
+                "font": {"color": COLOR["ink"]}, "title": {"text": "Housing sites (size = units)", "font": {"size": 12, "color": COLOR["ink"]}}})
     return figure
 
 
@@ -168,7 +171,7 @@ def heatmap_figure(matrix: np.ndarray, crash_noun: str) -> go.Figure:
                   "x": 0, "xanchor": "left", "y": 1.02, "yanchor": "bottom", "xpad": 0, "ypad": 0,
                   "title": {"text": f"{crash_noun.capitalize()} per weekday and hour", "side": "top",
                             "font": {"size": 12}},
-                  "tickfont": {"size": 11}, "tickformat": ",", "nticks": 5, "outlinewidth": 0},
+                  "tickfont": {"size": 11, "color": COLOR["ink"]}, "tickformat": ",", "nticks": 5, "outlinewidth": 0},
         hovertemplate="%{customdata}<br>%{z:,} " + crash_noun + "<extra></extra>"))
     figure.update_xaxes(title_text="Hour of day", showgrid=False, ticks="", dtick=2, fixedrange=False)
     figure.update_yaxes(autorange="reversed", showgrid=False, ticks="")
@@ -203,7 +206,7 @@ def scatter_figure(table: pd.DataFrame, crash_noun: str) -> go.Figure:
                  for value in table["crashes_per_year"]]
     figure.add_trace(go.Scatter(
         x=table["affordable_units"], y=table["crashes_per_year"].clip(lower=0.1), mode="markers",
-        marker={"size": 9, "color": _rgba(COLOR["ink-2"], 0.55), "line": {"color": COLOR["surface"], "width": 1}},
+        marker={"size": 9, "color": _rgba(COLOR["housing"], 0.7), "line": {"color": COLOR["page"], "width": 1}},
         customdata=np.column_stack([table["zip"], table["borough"], table["buildings"].astype(int),
                                     table["crashes"], true_rate]),
         hovertemplate=("<b>ZIP %{customdata[0]}</b>, %{customdata[1]}<br>"
@@ -225,7 +228,7 @@ def event_figure(study: dict) -> go.Figure:
         return empty_figure("Too few usable sites for a before and after comparison.")
     rel_years = study["rel_years"]
     figure = _figure(hovermode="x unified")
-    figure.add_vrect(x0=-0.5, x1=0.5, fillcolor=COLOR["sunken"], opacity=0.7, line_width=0, layer="below")
+    figure.add_vrect(x0=-0.5, x1=0.5, fillcolor=_rgba(COLOR["housing"], 0.06), line_width=0, layer="below")
     figure.add_hline(y=100, line={"color": COLOR["line-strong"], "width": 1})
 
     def add_line(profile, name, color, symbol, dash):

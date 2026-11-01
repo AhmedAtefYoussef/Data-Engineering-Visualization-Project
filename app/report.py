@@ -6,19 +6,21 @@ a chart without enough data gets an empty state that says what is missing.
 """
 from __future__ import annotations
 
+import csv
+import io
 from dataclasses import dataclass
 
 import numpy as np
 import plotly.graph_objects as go
 from dash import html
 
-from app import charts, data
+from app import charts, components, data
 from app.data import MIN_GROUP_N, Store
 from app.filters import (Filters, buffer_m, chips, crash_scope_text, housing_kind_text, housing_scope_text,
                          baseline_text, nearest_site_text, place_text, year_text)
-from app.story import signed
+from app.story_text import signed
 
-GEOJSON_URL = "/data/crash-grid.geojson"
+GEOJSON_URL = "/data/crash-grid.geojson"      # the bare route; app.app imports it
 MIN_ZIPS_FOR_SCATTER = 5
 CHART_KEYS = ["map", "selection", "trend", "completions", "factors", "heatmap", "scatter", "event"]
 
@@ -30,6 +32,12 @@ class Panel:
     figure: go.Figure
     scope: list          # which filters apply and the n behind the chart
     note: list           # how to read it, and what it does not show
+
+
+def grid_url() -> str:
+    """The grid's URL with its content hash. A late import, because app.app imports this module."""
+    from app.app import grid_url as versioned
+    return versioned()
 
 
 def _scope(*parts) -> list:
@@ -47,7 +55,7 @@ def _map_panel(store: Store, filters: Filters) -> Panel:
     if cells.empty and sites.empty:
         figure = charts.empty_figure("No located crashes and no housing sites match this selection.")
     else:
-        figure = charts.map_figure(cells, sites, noun, GEOJSON_URL, zoom_to_selection=bool(filters.boroughs))
+        figure = charts.map_figure(cells, sites, noun, grid_url(), zoom_to_selection=bool(filters.boroughs))
     scope = _scope(f"Crashes: {crash_scope_text(filters)}", f"Housing: {housing_scope_text(filters)}",
                    _n(f"n = {int(cells['crashes'].sum()):,} located crashes in {len(cells):,} cells, "
                       f"{len(sites):,} housing sites"))
@@ -241,34 +249,39 @@ def _widen_hint(filters: Filters) -> str:
     return "Try widening " + (", ".join(tight[:-1]) + " and " + tight[-1] if len(tight) > 1 else tight[0]) + "."
 
 
-def _tile(value: str, label: str, detail: str | None = None) -> html.Div:
-    return html.Div([html.P(value, className="tile-value"), html.P(label, className="tile-label"),
-                     html.P(detail, className="tile-detail") if detail else None], className="tile")
+def _figure(value: str, label: str, detail: str, tone: str, count_to: float | None) -> html.Div:
+    """One big figure on the ground. It carries the class the Generate sequence settles in."""
+    figure = components.metric(value, label, detail, tone, count_to)
+    figure.className = "metric tile"
+    return figure
 
 
 def summary_tiles(filters: Filters, numbers: dict) -> list:
-    """The four numbers above the charts."""
+    """The four numbers above the charts; each counts up when a new report arrives."""
     anywhere = numbers["crashes_anywhere"]
-    near_share = f"{numbers['crashes_near'] / anywhere * 100:.0f}%" if anywhere else "n/a"
+    share = numbers["crashes_near"] / anywhere * 100 if anywhere else None
     place = f"within {buffer_m()} m of housing" if filters.scope == "near" else place_text(filters)
     kind = nearest_site_text(filters)
     if filters.housing_filter_ignored:
         place += " (housing filters apply only near housing)"
     return [
-        _tile(f"{numbers['crashes']:,}", filters.harm_noun.capitalize(), f"{place}, {year_text(filters)}"),
-        _tile(near_share, f"of matching crashes are within {buffer_m()} m of a housing site (completed or planned)",
-              f"{numbers['crashes_near']:,} of {anywhere:,}; {kind}"),
-        _tile(f"{numbers['buildings']:,}", "Affordable-housing buildings completed",
-              f"{numbers['buildings_unlocated']:,} without a public address"),
-        _tile(f"{numbers['affordable_units']:,}", "Affordable units in those buildings",
-              f"of {numbers['total_units']:,} units in total"),
+        _figure(f"{numbers['crashes']:,}", filters.harm_noun.capitalize(), f"{place}, {year_text(filters)}",
+                "is-crash", numbers["crashes"]),
+        _figure(f"{share:.0f}%" if share is not None else "n/a",
+                f"of matching crashes are within {buffer_m()} m of a housing site (completed or planned)",
+                f"{numbers['crashes_near']:,} of {anywhere:,}; {kind}", "is-crash", share),
+        _figure(f"{numbers['buildings']:,}", "Affordable-housing buildings completed",
+                f"{numbers['buildings_unlocated']:,} without a public address", "is-housing", numbers["buildings"]),
+        _figure(f"{numbers['affordable_units']:,}", "Affordable units in those buildings",
+                f"of {numbers['total_units']:,} units in total", "is-housing", numbers["affordable_units"]),
     ]
 
 
 def report_header(filters: Filters, numbers: dict, query: str | None, notes: list[str] | None = None) -> list:
     """Active filters as labelled chips, one sentence with the n, and any caution for this selection."""
-    children = [html.Ul([html.Li([html.Span(label, className="chip-label"), value], className="chip")
-                         for label, value in chips(filters)], className="chips", **{"aria-label": "Active filters"})]
+    children = [html.Ul([html.Li([html.Span(label, className="chip-label"), value], className="chip chip-found",
+                                 style={"--i": position})
+                         for position, (label, value) in enumerate(chips(filters))], className="chips", **{"aria-label": "Active filters"})]
     if query:
         children.insert(0, html.P(["From your search: ", html.Q(query)], className="from-search"))
     children += [html.P(note, className="aside") for note in notes or []]
@@ -289,20 +302,73 @@ def report_header(filters: Filters, numbers: dict, query: str | None, notes: lis
     return children
 
 
-def build_report(store: Store, filters: Filters, query: str | None = None, notes: list[str] | None = None) -> dict:
-    """All content for one selection: header, tiles and one `Panel` per chart key."""
+PANEL_BUILDERS = {
+    "map": lambda store, filters, numbers: _map_panel(store, filters),
+    "selection": lambda store, filters, numbers: _selection_panel(store, filters),
+    "trend": lambda store, filters, numbers: _trend_panel(store, filters, numbers["crashes"]),
+    "completions": lambda store, filters, numbers: _completions_panel(store, filters, numbers),
+    "factors": lambda store, filters, numbers: _factors_panel(store, filters, numbers["crashes"]),
+    "heatmap": lambda store, filters, numbers: _heatmap_panel(store, filters, numbers["crashes"]),
+    "scatter": lambda store, filters, numbers: _scatter_panel(store, filters),
+}
+
+
+def pending_event_panel() -> Panel:
+    """What the before and after card shows until its own callback finishes."""
+    return Panel(charts.empty_figure("Working out the before and after comparison."),
+                 _scope("Calculating the comparison for this selection."), ["Drawn in a moment."])
+
+
+def build_main(store: Store, filters: Filters, query: str | None = None, notes: list[str] | None = None) -> dict:
+    """Header, figures and every chart except the event study, whose bootstrap can take a second cold."""
     numbers = data.headline_numbers(store, filters)
-    total = numbers["crashes"]
-    panels = {
-        "map": _map_panel(store, filters),
-        "selection": _selection_panel(store, filters),
-        "trend": _trend_panel(store, filters, total),
-        "completions": _completions_panel(store, filters, numbers),
-        "factors": _factors_panel(store, filters, total),
-        "heatmap": _heatmap_panel(store, filters, total),
-        "scatter": _scatter_panel(store, filters),
-        "event": _event_panel(store, filters),
-    }
-    assert list(panels) == CHART_KEYS
+    panels = {key: build(store, filters, numbers) for key, build in PANEL_BUILDERS.items()}
     return {"header": report_header(filters, numbers, query, notes), "tiles": summary_tiles(filters, numbers),
             "panels": panels, "numbers": numbers}
+
+
+def build_event(store: Store, filters: Filters) -> Panel:
+    return _event_panel(store, filters)
+
+
+def build_report(store: Store, filters: Filters, query: str | None = None, notes: list[str] | None = None) -> dict:
+    """All content for one selection: header, tiles and one `Panel` per chart key."""
+    report = build_main(store, filters, query, notes)
+    report["panels"]["event"] = build_event(store, filters)
+    report["panels"] = {key: report["panels"][key] for key in CHART_KEYS}
+    return report
+
+
+CSV_HEADER = ["section", "item", "period", "value"]
+
+
+def summary_csv(store: Store, filters: Filters) -> str:
+    """The selection, headline figures and yearly tables as one tidy CSV, from the same functions as the charts."""
+    numbers = data.headline_numbers(store, filters)
+    out = io.StringIO()
+    writer = csv.writer(out, lineterminator="\n")
+    writer.writerow(CSV_HEADER)
+    for label, value in chips(filters):
+        writer.writerow(["Selection", label, "", value])
+    writer.writerow(["Headline", filters.harm_noun.capitalize(), "", numbers["crashes"]])
+    writer.writerow(["Headline", "Matching crashes anywhere in the city", "", numbers["crashes_anywhere"]])
+    writer.writerow(["Headline", f"Matching crashes within {buffer_m()} m of a housing site", "", numbers["crashes_near"]])
+    writer.writerow(["Headline", "Affordable-housing buildings completed", "", numbers["buildings"]])
+    writer.writerow(["Headline", "Buildings without a public address", "", numbers["buildings_unlocated"]])
+    writer.writerow(["Headline", "Affordable units", "", numbers["affordable_units"]])
+    writer.writerow(["Headline", "Units in total", "", numbers["total_units"]])
+    trend = data.crash_trend(store, filters)
+    monthly = trend.attrs["monthly"]
+    for stamp, row in trend.iterrows():
+        period = stamp.strftime("%Y-%m") if monthly else int(stamp)
+        for borough, count in row.items():
+            writer.writerow(["Crashes by period and borough", borough, period, int(count)])
+    writer.writerow(["Crashes by period and borough", "No recorded borough", "all years",
+                     numbers["crashes_unknown_borough"]])
+    tables = data.completions_by_year(store, filters)
+    for section, table in (("Affordable units completed", tables["affordable_units"]),
+                           ("Buildings completed", tables["buildings"])):
+        for year, row in table.iterrows():
+            for kind, count in row.items():
+                writer.writerow([section, kind, int(year), int(count)])
+    return out.getvalue()

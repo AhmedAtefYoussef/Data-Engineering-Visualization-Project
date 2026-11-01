@@ -528,7 +528,11 @@ def test_generate_button_drives_every_chart_and_the_numbers(client):
 
 def test_no_other_callback_writes_to_the_charts(client):
     for item in _callbacks(client):
-        if "generate.n_clicks" in {f"{i['id']}.{i['property']}" for i in item["inputs"]}:
+        inputs = {f"{i['id']}.{i['property']}" for i in item["inputs"]}
+        if "generate.n_clicks" in inputs:
+            continue
+        if inputs == {"report-filters.data"}:          # the before and after chart has its own callback
+            assert item["output"].count("fig-") == 1 and "fig-event.figure" in item["output"], item["output"]
             continue
         assert "fig-" not in item["output"], item["output"]
 
