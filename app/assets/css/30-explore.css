@@ -1,0 +1,227 @@
+/* Explore: the luminous search box, the filters, the actions, the figures and the report's four parts.
+   Everything sits on the night ground; only the filters and the map are raised. Tokens only. */
+
+/* ---------- search ---------- */
+@property --ring { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.control-block { max-width: 78rem; }
+.band-explore .chapter-head { margin-bottom: var(--space-6); }
+.search { max-width: 62rem; }
+.search-label { margin-bottom: var(--space-3); color: var(--color-ink-2); }
+
+/* The field is large and lit from within. On focus a gold arc runs around its edge (a masked conic gradient whose
+   start angle turns), and a warm glow rises behind it. */
+.search-box {
+  position: relative; isolation: isolate; border-radius: 999px; border: 1px solid var(--color-line-strong);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.03));
+  box-shadow: 0 0 0 0 rgb(var(--gold-rgb) / 0), 0 12px 60px -18px rgb(var(--gold-rgb) / 0.35);
+  animation: search-breathe 6s ease-in-out infinite;
+  transition: border-color var(--duration-base) ease-out, box-shadow var(--duration-slow) var(--ease-out);
+}
+.search-box:hover { border-color: rgb(var(--gold-rgb) / 0.55); }
+.search-box:focus-within { border-color: transparent; animation: none; box-shadow: 0 0 0 1px rgb(var(--gold-rgb) / 0.25), 0 14px 90px -12px rgb(var(--gold-rgb) / 0.55); }
+.search-ring {
+  position: absolute; inset: -1px; z-index: 2; padding: 2px; border-radius: inherit; pointer-events: none; opacity: 0;
+  background: conic-gradient(from var(--ring), transparent 0 45%, rgb(var(--gold-rgb) / 0.25) 62%, var(--color-primary) 84%, var(--color-accent-strong) 94%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  transition: opacity var(--duration-base) ease-out;
+}
+.search-box:focus-within .search-ring { opacity: 1; animation: ring-turn 3.4s linear infinite; }
+@keyframes ring-turn { to { --ring: 360deg; } }
+@keyframes search-breathe { 50% { box-shadow: 0 0 0 0 rgb(var(--gold-rgb) / 0), 0 12px 80px -14px rgb(var(--gold-rgb) / 0.55); } }
+
+.search-input {
+  display: block; width: 100%; min-height: 4.5rem; padding: 0 15.5rem 0 4.25rem; font: inherit; font-size: var(--text-md);
+  color: var(--color-ink); background: transparent no-repeat 1.6rem center / 1.5rem url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e5bd6f' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.6-3.6'/%3E%3C/svg%3E");
+  border: 0; border-radius: 999px; outline: none; appearance: none; caret-color: var(--color-primary);
+}
+.search-input::placeholder { color: var(--color-ink-3); opacity: 1; }
+.search-box.is-typing .search-input::placeholder { color: transparent; }
+.search-input::-webkit-search-cancel-button { display: none; }
+.search-input:disabled { color: var(--color-ink-3); cursor: not-allowed; }
+/* The example queries typed into the empty field (30-explore.js). */
+.search-type {
+  position: absolute; left: 4.25rem; right: 15.5rem; top: 0; bottom: 0; z-index: 1; display: flex; align-items: center; overflow: hidden;
+  color: var(--color-ink-2); font-size: var(--text-md); white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity var(--duration-base) ease-out;
+}
+.search-box.is-typing .search-type { opacity: 1; }
+.search-box.is-typing .search-type::after { content: ""; flex: none; width: 2px; height: 1.25em; margin-left: 3px; background: var(--color-primary); animation: caret 1s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+
+/* The clear button pops in and the Enter hint slides in behind it, once there is something to clear or run. */
+.search-tools { position: absolute; right: var(--space-4); top: 0; bottom: 0; z-index: 3; display: flex; align-items: center; gap: var(--space-4); pointer-events: none; }
+.search-clear {
+  display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; padding: 0 0 2px; font: inherit; font-size: 1.6rem; line-height: 1;
+  color: var(--color-ink-2); background: rgb(255 255 255 / 0.06); border: 1px solid var(--color-line-strong); border-radius: 50%; cursor: pointer;
+  visibility: hidden; opacity: 0; scale: 0.3; rotate: -90deg;
+  transition: opacity var(--duration-base) ease-out, scale 480ms cubic-bezier(0.34, 1.56, 0.64, 1), rotate 480ms var(--ease-out), visibility 0s linear 480ms, background-color var(--duration-fast) ease-out, color var(--duration-fast) ease-out;
+}
+.search-clear:hover { background: var(--color-accent-soft); color: var(--color-primary); }
+.search-key {
+  padding-left: var(--space-4); border-left: 1px solid var(--color-line-strong); color: var(--color-ink-2); font-size: var(--text-xs); line-height: 2rem; white-space: nowrap;
+  visibility: hidden; opacity: 0; translate: 18px 0;
+  transition: opacity 320ms ease-out 120ms, translate 520ms var(--ease-out) 120ms, visibility 0s linear 520ms;
+}
+.search-key kbd {
+  display: inline-block; padding: 1px 6px; font: inherit; line-height: 1.4; font-weight: 600; color: var(--color-ink);
+  background: rgb(255 255 255 / 0.06); border: 1px solid var(--color-line-strong); border-bottom-width: 2px; border-radius: 5px;
+}
+.search-box:has(.search-input:not(:placeholder-shown)) .search-clear { visibility: visible; opacity: 1; scale: 1; rotate: 0deg; pointer-events: auto; transition-delay: 0s; }
+.search-box:has(.search-input:not(:placeholder-shown)) .search-key { visibility: visible; opacity: 1; translate: 0 0; transition-delay: 120ms, 120ms, 0s; }
+
+/* Example queries: they enter one after another, lift and glow on hover, and a wave runs through their letters. */
+.examples { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-4); color: var(--color-ink-2); font-size: var(--text-sm); }
+.example {
+  min-height: 2.5rem; padding: 0 var(--space-4); font: inherit; font-size: var(--text-sm); color: var(--color-accent-strong);
+  background: rgb(255 255 255 / 0.03); border: 1px solid var(--color-line-strong); border-radius: 999px; cursor: pointer;
+  animation: arrive 700ms var(--ease-out) backwards; animation-delay: calc(300ms + var(--i, 0) * 110ms);
+  transition: background-color var(--duration-fast) ease-out, border-color var(--duration-fast) ease-out, translate var(--duration-base) var(--ease-out), box-shadow var(--duration-base) ease-out;
+}
+.example:hover { translate: 0 -2px; background: var(--color-accent-soft); border-color: var(--color-primary); box-shadow: 0 10px 30px -10px rgb(var(--gold-rgb) / 0.55); }
+.example:active { scale: 0.97; }
+
+/* The feedback line keeps its height whether it shows the hint or the parsed query, so the filters do not move. */
+.search-feedback { min-height: 4rem; margin-top: var(--space-4); font-size: var(--text-sm); color: var(--color-ink-2); }
+.feedback-lead { display: inline-block; margin-right: var(--space-2); font-weight: 600; color: var(--color-ink); }
+.search-feedback .feedback-miss, .feedback-unused { color: var(--color-caution-ink); }
+.feedback-unused, .feedback-next { margin-top: var(--space-2); }
+.feedback-next:first-child { margin-top: 0; }
+.feedback-next { color: var(--color-ink-3); }
+.search-feedback .chips { display: inline-flex; vertical-align: middle; }
+
+/* Chips for what was understood and for the filters on screen: gold-outlined, they spring in one after another. */
+.chip-found {
+  background: transparent; border: 1px solid rgb(var(--gold-rgb) / 0.6); color: var(--color-accent-strong);
+  animation: chip-spring 560ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards; animation-delay: calc(var(--i, 0) * 90ms);
+}
+.chip-found .chip-label { color: var(--color-ink-2); }
+@keyframes chip-spring { from { opacity: 0; scale: 0.4; translate: 0 8px; } 60% { opacity: 1; } }
+
+.divider { display: flex; align-items: center; gap: var(--space-4); margin: var(--space-7) 0 var(--space-5); color: var(--color-ink-2); font-size: var(--text-sm); }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--color-line-strong)); }
+.divider::after { transform: scaleX(-1); }
+
+/* ---------- filters and actions ---------- */
+.controls { position: relative; z-index: 2; padding: var(--space-6); background: linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.015)); border-color: var(--color-line-strong); border-radius: calc(var(--radius) + 6px); }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(16.5rem, 100%), 1fr)); gap: var(--space-5) var(--space-5); align-items: start; }
+
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--color-line); }
+.actions-gap { flex: 1 1 0; min-width: 0; }
+.copy-status { min-width: 6rem; color: var(--color-preservation); font-size: var(--text-sm); font-weight: 600; }
+.copy-status:not(:empty) { animation: chip-spring 520ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.stale-hint { flex: 1 1 100%; color: var(--color-caution-ink); font-size: var(--text-sm); font-weight: 600; }
+.stale-hint:not(:empty) { animation: arrive var(--duration-base) var(--ease-out); }
+
+/* Generate is the one primary action: larger, with a slow light that crosses it while idle, and a gentle pulse
+   when the filters have changed since the report on screen. */
+.generate { min-height: 3.75rem; padding: 0 var(--space-7); font-size: var(--text-md); }
+.generate::before, .generate:is(:hover, :focus-visible)::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; padding: 0; opacity: 1; -webkit-mask: none; mask: none;
+  background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 0.4) 50%, transparent 62%);
+  transform: translateX(-130%); animation: idle-light 5.5s ease-in-out 1.2s infinite;
+}
+.generate:disabled::before { animation: none; }
+@keyframes idle-light { 0%, 55% { transform: translateX(-130%); } 100% { transform: translateX(130%); } }
+.generate.is-stale { animation: stale-pulse 2.2s ease-in-out infinite; }
+@keyframes stale-pulse {
+  0%, 100% { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.55), 0 0 0 0 rgb(var(--gold-rgb) / 0.55), 0 8px 40px -12px rgb(var(--gold-rgb) / 0.55); }
+  50% { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.55), 0 0 0 14px rgb(var(--gold-rgb) / 0), 0 8px 54px -8px rgb(var(--gold-rgb) / 0.8); }
+}
+
+/* ---------- report ---------- */
+.report { position: relative; margin-top: var(--space-9); }
+.report::before {
+  content: ""; position: sticky; top: var(--masthead-height, 4.5rem); z-index: 20; display: block; height: 3px; margin-bottom: -3px;
+  background: var(--color-primary); box-shadow: 0 0 16px var(--color-primary); transform-origin: left center; transform: scaleX(0);
+  opacity: 0; transition: opacity var(--duration-base) ease-out; pointer-events: none;
+}
+.report.is-loading::before { opacity: 1; animation: progress 4s var(--ease-out) forwards; }
+.report-header, .figures, .group { transition: opacity var(--duration-base) ease-out; }
+.report.is-loading .report-header, .report.is-loading .figures, .report.is-loading .group { opacity: 0.45; pointer-events: none; }
+.report-header { display: grid; gap: var(--space-4); max-width: 62rem; }
+.from-search { color: var(--color-ink-2); font-size: var(--text-md); }
+.from-search q { color: var(--color-accent-strong); }
+.report-header .chips { gap: var(--space-3); }
+
+/* The four figures: big display numbers straight on the ground, offset so they do not read as a row of boxes. */
+.figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-6) var(--space-7); margin: var(--space-7) 0 var(--space-6); min-height: 11rem; }
+.figures .metric-value { font-size: clamp(2.5rem, 1rem + 3vw, var(--text-2xl)); font-weight: 500; text-shadow: 0 0 0.7em color-mix(in srgb, currentColor 30%, transparent); }
+.figures .metric-label { color: var(--color-ink); font-weight: 600; }
+
+/* The report in four plain parts. Charts flow in one composition: a tall full-width map, charts that sit beside
+   their words, a pair, a wide line. They share the ground; none is boxed. */
+.group { margin-top: var(--space-9); }
+.group-title { font-family: var(--font-display); line-height: 1.02; letter-spacing: -0.015em; margin-bottom: var(--space-6); font-size: clamp(2.25rem, 1.2rem + 3vw, var(--text-2xl)); font-weight: 500; }
+.group-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--space-8) var(--space-6); }
+.card { display: flex; flex-direction: column; min-width: 0; }
+.card-full { grid-column: 1 / -1; }
+.card-half { grid-column: span 6; }
+.card-split {
+  grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: var(--space-7);
+  grid-template-rows: auto auto 1fr; grid-template-areas: "head graph" "scope graph" "note graph"; align-items: start;
+}
+.card-flip { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); grid-template-areas: "graph head" "graph scope" "graph note"; }
+.card-split .card-head { grid-area: head; }
+.card-split .card-scope { grid-area: scope; }
+.card-split .graph { grid-area: graph; height: 28rem; }
+.card-split .chart-note { grid-area: note; }
+.card-head { display: grid; gap: var(--space-1); }
+.card-head h4 { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 500; line-height: 1.15; letter-spacing: -0.01em; text-wrap: balance; }
+.card-kind { color: var(--color-ink-3); font-size: var(--text-xs); }
+.card-scope { display: flex; flex-wrap: wrap; gap: 2px var(--space-4); min-height: 2.6rem; margin: var(--space-3) 0 var(--space-4); color: var(--color-ink-3); font-size: var(--text-xs); line-height: 1.5; }
+.scope-n { color: var(--color-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.card-scope.is-loading::after { content: ""; flex: 1 1 100%; height: 2px; background: linear-gradient(90deg, transparent, var(--color-primary), transparent) 0 0 / 200% 100%; animation: shimmer 1.2s linear infinite; }
+.card .graph { transition: opacity var(--duration-base) ease-out; }
+.card:has(.card-scope.is-loading) .graph { opacity: 0.35; }
+.chart-note { margin-top: var(--space-4); color: var(--color-ink-2); font-size: var(--text-sm); line-height: 1.65; max-width: 68ch; }
+.explore-foot { margin-top: var(--space-8); }
+
+/* Sizes: the map is the tallest thing in the report, on the dark CARTO style, edge to edge. */
+.card-map .graph-map { height: clamp(28rem, 82vh, 48rem); border: 1px solid var(--color-line-strong); border-radius: calc(var(--radius) + 6px); box-shadow: 0 30px 90px -40px rgb(var(--gold-rgb) / 0.35); }
+.card-map .card-head { grid-auto-flow: column; justify-content: space-between; align-items: baseline; }
+.card-full .graph { height: 26rem; }
+.card-tall .graph { height: 30rem; }
+.card-half .graph { height: 27rem; }
+.card-bars-h .graph { height: 30rem; }
+
+/* Charts draw in where they are created: lines and dots sweep from the left, bars rise, the heat map and map fade. */
+@keyframes line-draw { from { clip-path: inset(-6px 100% -6px -6px); } to { clip-path: inset(-6px -6px -6px -6px); } }
+@keyframes bar-rise { from { transform: scaleY(0); } }
+@keyframes bar-run { from { transform: scaleX(0); } }
+@keyframes fade-in { from { opacity: 0; } }
+.graph .scatterlayer .trace { animation: line-draw 1500ms var(--ease-out) backwards; }
+.card-bars .barlayer .point path, .card-bars-h .barlayer .point path { transform-box: fill-box; transform-origin: 50% 100%; animation: bar-rise 900ms var(--ease-out) backwards; }
+.card-bars-h .barlayer .point path { transform-origin: 0 50%; animation-name: bar-run; }
+.graph .heatmaplayer, .graph .annotation-text-g { animation: fade-in 1100ms ease-out backwards; }
+
+/* The map's own attribution comes in light colours; set it for the night ground. */
+.graph .maplibregl-ctrl-attrib, .graph .maplibregl-ctrl-attrib.maplibregl-compact { background: rgb(19 24 41 / 0.88); color: var(--color-ink-2); }
+.graph .maplibregl-ctrl-attrib a { color: var(--color-ink); }
+.graph .maplibregl-ctrl-attrib-button { filter: invert(1) brightness(1.2); }
+.graph .maplibregl-ctrl-attrib.maplibregl-compact-show { background: rgb(19 24 41 / 0.95); }
+
+@media (max-width: 1000px) {
+  .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .group-grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-8); }
+  .card-half, .card-split, .card-flip { grid-column: 1 / -1; }
+  .card-split, .card-flip { display: flex; flex-direction: column; }
+  .card-split .graph { height: 24rem; }
+  .card-map .graph-map { height: clamp(26rem, 70vh, 36rem); }
+}
+@media (max-width: 720px) {
+  .controls { padding: var(--space-5) var(--space-4); }
+  .search-input { min-height: 4rem; padding: 0 4.25rem 0 3.5rem; font-size: var(--text-base); background-position: 1.1rem center; background-size: 1.3rem; }
+  .search-type { left: 3.5rem; right: 4.25rem; font-size: var(--text-base); }
+  .search-key { display: none; }
+  .generate { width: 100%; }
+  .actions-gap { display: none; }
+}
+@media (max-width: 460px) {
+  .figures { grid-template-columns: minmax(0, 1fr); }
+}
+@media (pointer: coarse) {
+  .example { min-height: 2.75rem; padding: 0 var(--space-4); }
+  .search-key { display: none; }
+  .search-input { padding-right: 4.25rem; }
+  .search-type { right: 4.25rem; }
+}

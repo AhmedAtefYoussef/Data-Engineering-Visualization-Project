@@ -7,7 +7,10 @@ payload a browser sends, so they exercise routing, callbacks and JSON serialisat
 """
 from __future__ import annotations
 
+import dataclasses
+import importlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -17,11 +20,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
-from app import data
+from app import data, stats
 from app.callbacks import CONTROL_IDS, control_values
 from app.filters import BOROUGHS, FACTOR_GROUPS, HOUR_BANDS, YEAR_END, YEAR_START, from_dict, make_filters
 from app.report import CHART_KEYS, build_report
 from app.search import BOROUGH_WORDS, CONSTRUCTION_WORDS, FACTOR_WORDS, HOUR_WORDS, SIZE_WORDS, parse_query
+from app.story_text import signed
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -524,7 +528,11 @@ def test_generate_button_drives_every_chart_and_the_numbers(client):
 
 def test_no_other_callback_writes_to_the_charts(client):
     for item in _callbacks(client):
-        if "generate.n_clicks" in {f"{i['id']}.{i['property']}" for i in item["inputs"]}:
+        inputs = {f"{i['id']}.{i['property']}" for i in item["inputs"]}
+        if "generate.n_clicks" in inputs:
+            continue
+        if inputs == {"report-filters.data"}:          # the before and after chart has its own callback
+            assert item["output"].count("fig-") == 1 and "fig-event.figure" in item["output"], item["output"]
             continue
         assert "fig-" not in item["output"], item["output"]
 
@@ -658,3 +666,221 @@ def test_rq7_resamples_site_clusters(store):
     assert result["n_blocks"] == store.sites.loc[store.sites["borough_percentile"].notna()
                                                  & (store.sites["construction_type"] == "New Construction"),
                                                  "cluster_id"].nunique()
+
+
+# ---------------------------------------------------------------------------------------------
+# Regressions: comparison counts, the RQ7 weighting, the ZIP-level "kept" rule and constant ownership
+# ---------------------------------------------------------------------------------------------
+def test_used_sizes_counts_sites_not_rows():
+    """One comparison site serves two cohorts: two rows, one site. A cohort lacking an arm is not used."""
+    sizes = stats.used_sizes(site_ids=[1, 2, 3, 3, 4, 5],
+                             treated=[True, True, False, False, False, True],
+                             strata=[2019, 2020, 2019, 2020, 2019, 2021],
+                             clusters=["a", "a", "b", "b", "c", "d"])
+    assert sizes == {"n_treated": 2, "n_control": 3, "n_treated_sites": 2, "n_comparison_sites": 2,
+                     "n_clusters": 4, "n_treated_clusters": 1}
+
+
+def test_comparison_sites_and_rows_are_not_confused(store):
+    table, events = store.robustness, store.event_sites
+    comparison = events[~events["treated"]]
+    central = table[table["kind"] == "central"].iloc[0]
+    assert central["n_comparison"] == len(comparison)
+    assert central["n_comparison_sites"] == comparison["site_id"].nunique() < central["n_comparison"]
+    assert (table["n_comparison_sites"] <= table["n_comparison"]).all()
+    assert (table["n_comparison_sites"] <= store.meta["rows"]["sites"]).all()   # a row count here exceeded every site
+    assert (table["n_treated_clusters"] <= table["n_resampled_units"]).all()
+    rq3 = store.results["detail"]["rq3_did"]
+    new_build = events[events["treated"] & (events["construction_type"] == "New Construction")]
+    assert rq3["n_comparison_sites"] == comparison["site_id"].nunique() and rq3["n_control"] == len(comparison)
+    assert rq3["n_treated_clusters"] == new_build["cluster_id"].nunique()
+    assert f"{rq3['n_comparison_sites']:,} comparison sites" in store.results["questions"]["RQ6"]["sentence"]
+
+    filters = make_filters(construction=["New Construction"])
+    study = data.event_study(store, filters)
+    assert study["comparison"]["n_sites"] == study["n_comparison_sites"] == rq3["n_comparison_sites"]
+    assert study["comparison"]["n_rows"] == study["n_comparison"] == rq3["n_control"]
+    scope = _text(build_report(store, filters)["panels"]["event"].scope)
+    assert f"{rq3['n_comparison_sites']:,} comparison sites ({rq3['n_control']:,} rows" in scope
+    assert f"{rq3['n_control']:,} comparison sites" not in scope
+
+
+def test_a_group_needs_enough_unique_sites_not_rows(store):
+    """Comparison rows above MIN_GROUP_N do not pass the gate when they come from fewer unique sites."""
+    events = store.event_sites
+    comparison = events[~events["treated"]]
+    per_site = comparison.groupby("site_id").size()
+    repeated = per_site[per_site >= 2].index.to_numpy()
+
+    def view(n_sites):
+        rows = comparison["site_id"].isin(repeated[:n_sites])
+        sample = pd.concat([events[events["treated"]], comparison[rows]]).sort_index()
+        assert rows.sum() >= data.MIN_GROUP_N
+        changed = dataclasses.replace(store, event_sites=sample)
+        return data.event_study(changed, make_filters(construction=["New Construction"]))
+
+    assert view(data.MIN_GROUP_N - 1).get("empty")
+    assert not view(data.MIN_GROUP_N).get("empty")
+
+
+def test_type_contrast_reports_the_rows_it_used():
+    """15 of 30 first-type sites sit in a stratum without comparison rows, so they are not used."""
+    strata = np.array(["A"] * 15 + ["B"] * 15 + ["A"] * 20 + ["A"] * 40)
+    arm = np.array([1] * 30 + [2] * 20 + [0] * 40)
+    change = np.arange(len(arm), dtype=float) % 5
+    result = stats.type_contrast(np.ones(len(arm)), change, arm, strata, np.arange(len(arm)))
+    assert (result["first"]["n_treated"], result["first"]["n_treated_dropped"]) == (15, 15)
+    assert (result["second"]["n_treated"], result["second"]["n_control"]) == (20, 40)
+    assert (result["difference"]["n_treated"], result["difference"]["n_control"]) == (35, 40)
+
+
+def test_robustness_rows_cover_the_comparison_group_and_wide_clusters(store):
+    table, detail = store.robustness, store.results["detail"]
+    cuts = table[table["check"] == detail["comparison_subset_check"]]
+    assert len(cuts) == 4 and cuts["estimate"].notna().all()
+    assert (table["check"] == "Clusters").sum() == 1
+    central = table[table["kind"] == "central"].iloc[0]
+    wide = table[table["check"] == "Clusters"].iloc[0]
+    assert wide["percent_change"] == pytest.approx(central["percent_change"])       # the same units
+    assert wide["n_resampled_units"] < central["n_resampled_units"]
+    assert wide["n_treated_clusters"] < central["n_treated_clusters"]
+
+
+def test_robustness_text_reads_from_the_rows_and_claims_no_fall(store):
+    from app.story_text import robustness_text
+    text = robustness_text(store)
+    table, detail = store.robustness, store.results["detail"]
+    cuts = table[table["check"] == detail["comparison_subset_check"]]
+    for row in cuts.itertuples():
+        assert row.variant in text and f"{row.n_comparison_sites:,} comparison sites" in text
+    assert "do not show that crashes fall" in text
+    for overstated in ["every version", "support no direction", "The exceptions all switch the screen off"]:
+        assert overstated not in text
+    overlap = detail["placebo_overlap"]
+    assert 0 < overlap["in_both"] < overlap["central_treated"] < overlap["placebo_treated"]
+    assert f"{overlap['in_both']} of the {overlap['central_treated']} central sites" in text
+
+
+def test_one_vote_per_cluster_counts_each_cluster_once():
+    percentiles = np.r_[np.full(100, 90.0), 50.0, 40.0]
+    clusters = np.r_[np.zeros(100), 1, 2]
+    result = stats.one_vote_per_cluster(percentiles, clusters)
+    assert result["estimate"] == pytest.approx((90 + 50 + 40) / 3 - 50)
+    assert result["n_clusters"] == 3 and result["share_above_pct"] == pytest.approx(100 / 3)
+    too_few = stats.one_vote_per_cluster(percentiles, clusters, min_clusters=4)
+    assert np.isnan(too_few["estimate"]) and np.isnan(too_few["low"]) and too_few["n_clusters"] == 3
+
+
+def test_rq7_one_vote_is_exported_and_matches_the_sites_table(store):
+    detail = store.results["detail"]
+    sites = store.sites[store.sites["borough_percentile"].notna() & (store.sites["construction_type"] == "New Construction")]
+    means = sites.groupby("cluster_id")["borough_percentile"].mean()
+    one_vote = detail["rq7"]["one_vote"]
+    assert one_vote["estimate"] == pytest.approx(means.mean() - 50)
+    assert one_vote["n"] == len(means) and one_vote["low"] < one_vote["estimate"] < one_vote["high"]
+    assert one_vote["low"] > 0                                                      # the direction claim stays
+    assert one_vote["estimate"] < detail["rq7"]["new"]["estimate"]                  # the size depends on the weighting
+    assert detail["rq7_new_sites"]["share_clusters_above_borough_median_pct"] == pytest.approx((means > 50).mean() * 100)
+
+    by_borough = {row["borough"]: row for row in detail["rq7_by_borough"]}
+    filters = make_filters(construction=["New Construction"], boroughs=["Brooklyn"])
+    selection = data.site_selection(store, filters)
+    in_brooklyn = sites[sites["borough"] == "Brooklyn"].groupby("cluster_id")["borough_percentile"].mean()
+    assert selection["one_vote"]["estimate"] == pytest.approx(in_brooklyn.mean() - 50)
+    assert by_borough["Brooklyn"]["new_one_vote_excess"] == pytest.approx(in_brooklyn.mean() - 50)
+    assert by_borough["Brooklyn"]["new_excess"] == pytest.approx(selection["excess"])
+    assert signed(selection["one_vote"]["estimate"]) in _text(build_report(store, filters)["panels"]["selection"].note)
+
+
+def test_rq7_reference_points_use_no_crash_after_the_baseline(store):
+    """The street-point grid was snapped to crashes up to 2025 before; baseline years only now."""
+    assert store.results["detail"]["rq7_new_sites"]["reference_points"] < 9985
+
+
+def test_page_states_rq7_size_as_dependent_on_weighting(store):
+    from app import story
+    questions, one_vote = store.results["questions"], store.results["detail"]["rq7"]["one_vote"]
+    page = " ".join(_text(part(store)) for part in [story.hero, story.findings, story.impact])
+    assert "largest effect" not in page and "far from zero" not in page
+    assert "depends on the weighting" in page and signed(one_vote["estimate"], 1) in page
+    assert questions["RQ7"]["kept"]
+    # A borough whose one-vote interval includes zero is named, so the citywide direction is not read as local.
+    for row in store.results["detail"]["rq7_by_borough"]:
+        if row.get("new_one_vote_low") is not None and row["new_one_vote_low"] <= 0 <= row["new_one_vote_high"]:
+            assert f"{row['borough']} ({signed(row['new_one_vote_excess'])}" in page
+
+
+def test_zip_level_questions_are_kept_only_if_both_versions_exclude_zero(store):
+    questions, reported = store.results["questions"], store.results["detail"]["reported_zips"]
+    for key, stored in [("RQ1", reported["rq1"]), ("RQ2", reported["rq2_stock"]), ("RQ9", reported["rq9"])]:
+        item = questions[key]
+        low, high = (stored["low"], stored["high"]) if key != "RQ9" else (round(stored["low"], 3), round(stored["high"], 3))
+        assert item["excludes_zero_reported"] == (low > 0 or high < 0), key
+        if item["kept"]:
+            assert item["excludes_zero"] and item["excludes_zero_reported"], key
+    assert questions["RQ1"]["excludes_zero"] and not questions["RQ1"]["kept"]
+    for key, item in questions.items():
+        if key not in {"RQ1", "RQ2", "RQ9"}:
+            assert item["excludes_zero_reported"] is None, key
+
+
+def test_rq1_says_did_not_improve_and_carries_no_strong_tag(store):
+    from app import story
+    from app.story_text import findings_lead, reading_label
+    questions = store.results["questions"]
+    text, css = reading_label(questions["RQ1"])
+    assert "strong" not in css and "ZIP" in text
+    assert reading_label(questions["RQ7"])[1] == "tag tag-strong"
+    lead = findings_lead(questions)
+    assert "did not improve the forecast" in lead
+    page = " ".join(_text(part(store)) for part in [story.hero, story.findings, story.limits, story.impact])
+    for wording in ["less accurate", "made the forecast", "made it worse"]:
+        assert wording not in page, wording
+    assert "less accurate" not in questions["RQ1"]["sentence"]
+
+
+def test_rq2_checks_are_beside_the_headline_on_the_page(store):
+    from app.story_text import finding_extras
+    checks, headline = store.results["detail"]["rq2_checks"], store.results["questions"]["RQ2"]
+    assert checks["leave_one_zip_out"]["low"] <= headline["estimate"] <= checks["leave_one_zip_out"]["high"]
+    assert checks["leave_one_zip_out"]["high"] == pytest.approx(checks["most_influential_zip"]["estimate"])
+    text = finding_extras(store)["RQ2"]
+    assert signed(checks["new_construction_stock"]["estimate"], 2) in text
+    assert signed(checks["leave_one_zip_out"]["low"], 2) in text and signed(checks["leave_one_zip_out"]["high"], 2) in text
+    assert f"ZIP {checks['most_influential_zip']['zip']}" in text
+
+
+def test_widened_levels_are_printed_exactly_and_rest_on_enough_replicates(store):
+    from app import story
+    assert stats.level_text(0.95) == "95%"
+    assert stats.level_text(0.9875) == "98.75%"
+    assert stats.level_text(1 - 0.05 / 9) == "99.44%"
+    questions = store.results["questions"]
+    assert "98.75% interval" in questions["RQ8"]["sentence"] and "99.44% interval" in questions["RQ10"]["sentence"]
+    findings = _text(story.findings(store))
+    assert "98.75%" in findings and "99.44%" in findings and "99% interval" not in findings
+    assert store.meta["constants"]["n_boot_joint"] >= 5000
+
+
+def test_the_three_shared_constants_have_one_owner():
+    """A value changed in the notebook's Section 1 must survive the paste of app/stats.py into Section 7."""
+    assemble = importlib.import_module("tools.assemble_notebook")
+    pasted = assemble.inline_source("# INLINE: app/stats.py")
+    block = assemble.inline_source("# INLINE-CONSTANTS: app/stats.py")
+    defined = {name: getattr(stats, name) for name in ["SEED", "N_BOOT", "CI_LEVEL"]}
+    namespace = {}
+    exec(block, namespace)
+    assert {name: namespace[name] for name in defined} == defined
+    namespace = {"SEED": 7, "N_BOOT": 50, "CI_LEVEL": 0.90}
+    exec(pasted, namespace)
+    assert (namespace["SEED"], namespace["N_BOOT"], namespace["CI_LEVEL"]) == (7, 50, 0.90)
+    assert namespace["bootstrap_ci"].__kwdefaults__ == {"clusters": None, "n_boot": 50, "seed": 7, "level": 0.90}
+    setup = (ROOT / "tools" / "notebook_src" / "01_setup.py").read_text(encoding="utf-8")
+    for name in defined:
+        assert not re.search(rf"^{name} = ", setup, re.M), name
+    assert "# INLINE-CONSTANTS: app/stats.py" in setup
+
+
+def test_event_chart_note_points_to_the_joint_interval(store):
+    note = _text(build_report(store, make_filters(construction=["New Construction"]))["panels"]["event"].note)
+    assert "not the overlap of the bands" in note

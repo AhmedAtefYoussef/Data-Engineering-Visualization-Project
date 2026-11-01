@@ -3,14 +3,15 @@
 #
 # One row per research question, read from `RESULTS` exactly as Section 8 stored it. `kept` means
 # the interval excludes zero and, where several things were tested together, the adjusted p-value
-# is below `FALSE_DISCOVERY_RATE`. Units differ, so every row names its own.
+# is below `FALSE_DISCOVERY_RATE`. A ZIP-level question must also exclude zero on reported ZIP codes
+# alone (the rule of Section 9.6). Units differ, so every row names its own.
 
 # %%
 OWNERS = {"RQ1": "M1", "RQ2": "M1", "RQ3": "M2", "RQ4": "M2", "RQ5": "M3",
           "RQ6": "M3", "RQ7": "M4", "RQ8": "M4", "RQ9": "M5", "RQ10": "M5"}
 # Short chart label, what n counts and what a value right of zero means, per question (labels only).
 RESULT_LAYOUT = {
-    "RQ1": ("Forecast error when housing is added", "ZIP codes", "right of zero = forecast less accurate with housing"),
+    "RQ1": ("Forecast error when housing is added", "ZIP codes", "right of zero = larger forecast error with housing"),
     "RQ2": ("Injury crashes as the unit stock grows", "ZIP codes", "right of zero = more injury crashes with a larger stock"),
     "RQ3": ("After against before, new buildings", "new-construction sites", "right of zero = more injury crashes after completion"),
     "RQ4": ("Change by units completed nearby", "new-construction sites", "right of zero = larger rise where more units were completed"),
@@ -27,22 +28,34 @@ SURPLUS_FROM_YEAR = BREAK_YEAR + 1   # first year in which injured totals above 
 STAGE_ORDER = ["raw", "cleaned", "integrated"]
 
 
-def level_text(level):
-    """An interval level as a percentage with one decimal where it is not whole (95%, 98.8%)."""
-    return f"{round(100 * level, 1):g}%"
+# The ZIP-level intervals on reported ZIP codes only (Section 9.6). RQ9 is read at its printed precision.
+REPORTED_ZIP_INTERVALS = {
+    "RQ1": (float(reported_forecast["low"]), float(reported_forecast["high"])),
+    "RQ2": (float(reported_stock["low_pct"]), float(reported_stock["high_pct"])),
+    "RQ9": (round(float(reported_ped["low"]), RQ9_DIGITS), round(float(reported_ped["high"]), RQ9_DIGITS)),
+}
+
+
+def interval_excludes_zero(low, high):
+    """True when the whole interval lies on one side of zero."""
+    return bool(low > 0 or high < 0)
 
 
 rows = []
 for key, (label, n_unit, direction) in RESULT_LAYOUT.items():
     stored = RESULTS[key]
-    excludes_zero = bool(stored["ci_low"] > 0 or stored["ci_high"] < 0)
+    excludes_zero = interval_excludes_zero(stored["ci_low"], stored["ci_high"])
     adjusted_p = stored["adjusted_p"]
+    # None for a question that is not at ZIP level, where the rule of Section 9.6 does not apply.
+    excludes_zero_reported = (interval_excludes_zero(*REPORTED_ZIP_INTERVALS[key])
+                              if key in REPORTED_ZIP_INTERVALS else None)
     rows.append({"rq": key, "owner": OWNERS[key], "label": label, "question": stored["question"],
                  "estimate": stored["estimate"], "low": stored["ci_low"], "high": stored["ci_high"],
                  "level": stored["level"], "unit": stored["unit"], "n": stored["n"], "n_unit": n_unit,
                  "direction": direction, "adjusted_p": float("nan") if adjusted_p is None else adjusted_p,
-                 "excludes_zero": excludes_zero,
-                 "kept": excludes_zero and (adjusted_p is None or adjusted_p < FALSE_DISCOVERY_RATE)})
+                 "excludes_zero": excludes_zero, "excludes_zero_reported": excludes_zero_reported,
+                 "kept": (excludes_zero and (adjusted_p is None or adjusted_p < FALSE_DISCOVERY_RATE)
+                          and excludes_zero_reported is not False)})
 summary_table = pd.DataFrame(rows).set_index("rq")
 assert set(summary_table.index) == set(RESULTS), "every research question stores exactly one result"
 digits = [3 if "correlation" in unit else 2 for unit in summary_table["unit"]]
@@ -78,34 +91,38 @@ show(fig)
 # %%
 kept = summary_table.index[summary_table["kept"]].tolist()
 not_kept = summary_table.index[summary_table["excludes_zero"] & ~summary_table["kept"]].tolist()
-say(f"Intervals that exclude zero and are kept: {', '.join(kept) or 'none'}. Excluding zero but not kept after "
-    f"adjustment: {', '.join(not_kept) or 'none'}. All others include zero. The ten intervals are not adjusted "
-    f"for each other, so one can exclude zero by chance.")
+say(f"Intervals that exclude zero and are kept: {', '.join(kept) or 'none'}. Excluding zero but not kept, after "
+    f"adjustment or because the interval includes zero on reported ZIP codes: {', '.join(not_kept) or 'none'}. All "
+    f"others include zero. The ten intervals are not adjusted for each other, so one can exclude zero by chance.")
 
 # RQ1 on reported ZIP codes only (Section 9.6): the footnote reads its numbers from the stored objects.
 rq1_low, rq1_high = float(reported_forecast["low"]), float(reported_forecast["high"])
-rq1_reading = "did not improve the forecast" if rq1_low <= 0 <= rq1_high else (
-    "made the forecast worse" if rq1_low > 0 else "improved the forecast")
+rq1_reading = "improved the forecast" if rq1_high < 0 else "did not improve the forecast"
 say(f"*RQ1 footnote.* On ZIP codes with a police-reported code only (Section 9.6) the change in forecast error is "
     f"{float(reported_forecast['mae_minus_baseline']):+.2f} ({rq1_low:+.2f} to {rq1_high:+.2f}), so on those codes housing "
-    f"{rq1_reading}; the \"kept\" mark above reads the same way only where the interval excludes zero.")
+    f"{rq1_reading}. With either version of the data, housing did not improve the forecast; the \"kept\" mark needs "
+    f"the interval to exclude zero on both versions.")
 
 # %% [markdown]
 # **Findings, one line per question.** RQ1: housing information did not improve a ZIP-level crash
-# forecast. RQ2: a growing affordable stock goes with no detectable movement in a ZIP's injury
-# crashes. RQ3: around isolated new buildings, injury crashes changed after completion about as much
+# forecast. RQ2: the slope on the whole affordable stock cannot be told from zero, but that reading
+# depends on one refinanced ZIP and on counting refinanced units as stock (9.6). RQ3: around isolated new buildings, injury crashes changed after completion about as much
 # as around unfinished sites of the same programme. RQ4: no relation with the number of units
 # completed. RQ5: new construction cannot be told apart from preservation. RQ6, RQ8, RQ10: no
 # detectable shift in who is hurt, the time of day or the recorded cause. RQ7: new-construction
 # sites stand where injury crashes were already above the borough's typical street point before the
-# project started. RQ9: a weak, not-kept hint that ZIP codes with a deeper affordable mix have a
-# lower pedestrian and cyclist share. Section 9 changed the radius, outcome, strata, cohorts and
-# screen; the RQ3 reading held in every version that kept the screen.
+# project started; citywide that direction holds, and its size depends on whether sites or clusters
+# are counted. RQ9: a weak, not-kept hint that ZIP codes with a deeper affordable mix have a lower
+# pedestrian and cyclist share. Section 9 changed the radius, outcome, strata, cohorts, clusters and
+# screen, and the RQ3 reading held in the versions that kept the screen and the whole comparison group.
+# Cutting the comparison group by start date or type moves the estimate, and some cuts exclude zero;
+# those cuts are unadjusted, so they do not show a fall, but they limit how far "no change" can be read.
 #
 # **Answer to the main question.** For the buildings we could isolate, the crash records do not show
 # the feared rise after an affordable building opens, but the intervals leave room for a moderate
 # fall or a small rise. What the records do show is where the buildings are: on streets that already
-# had many injury crashes (RQ7).
+# had many injury crashes (RQ7), though how far above the typical street depends on whether a building
+# or a cluster of buildings is the unit.
 #
 # ### 10.1 What surprised us
 
@@ -175,9 +192,10 @@ say(f"Housing: {limits['confidential_rows']:,} confidential rows ({limits['confi
 
 # %% [markdown]
 # - **Association, not cause.** Sites are not placed at random (RQ7). Completed sites are compared
-#   with unfinished sites of the same programme, but the groups still differ, and streets also get
-#   bike lanes, rezonings or rebuilt junctions that neither table records. For a new building the
-#   "before" years are construction years, and many completion dates are administrative.
+#   with unfinished sites of the same programme, but the groups still differ (the estimate moves when
+#   that group is cut by start date or type, 9.4), and streets also get bike lanes, rezonings or
+#   rebuilt junctions that neither table records. For a new building the "before" years are
+#   construction years, and many completion dates are administrative.
 # - **The 2020 reporting break.** Property-damage reports collapsed in 2020 and the pandemic changed
 #   traffic for months; every three-year window contains that year. Injury crashes and comparison
 #   sites are the defence (9.1), and no cohort lets us look at a completion without the pandemic.
@@ -264,7 +282,8 @@ def file_stamp(path):
     return pd.Timestamp(path.stat().st_mtime, unit="s").strftime("%Y-%m-%d")
 
 
-say(f"Seed {SEED}; {N_BOOT:,} bootstrap resamples per interval; study window {YEAR_START}-{YEAR_END}. Data as of: "
+say(f"Seed {SEED}; {N_BOOT:,} bootstrap resamples per interval ({N_BOOT_JOINT:,} for the tables of RQ8 and RQ10); "
+    f"study window {YEAR_START}-{YEAR_END}. Data as of: "
     f"latest crash {crashes['crash_date'].max():%Y-%m-%d}, latest housing completion "
     f"{housing['completion_date'].max():%Y-%m-%d}; housing file saved {file_stamp(HOUSING_FILE)}, crash file "
     f"{file_stamp(CRASH_FILE)}.")

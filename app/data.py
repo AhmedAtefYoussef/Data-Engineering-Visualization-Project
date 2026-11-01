@@ -20,7 +20,7 @@ from app import filters as filter_model
 from app.filters import Filters
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
-REL_YEARS = [-3, -2, -1, 0, 1, 2, 3]
+REL_YEARS = [-3, -2, -1, 0, 1, 2, 3]        # replaced by meta.constants.event_window when load() runs
 PRE_YEARS, POST_YEARS = [-3, -2, -1], [1, 2, 3]
 MIN_GROUP_N = 30               # the notebook's rule: no statistic for a group smaller than this
 MONTHLY_UP_TO_YEARS = 2        # the trend chart shows months when the selection is this short
@@ -31,6 +31,101 @@ EVENT_OUTCOME_FOR_HARM = {"injury": "injury", "pedcyc": "pedcyc", "ped": "pedcyc
                           "mot": "injury", "fatal": "injury", "all": "all"}
 EVENT_OUTCOME_NOUN = {"injury": "injury crashes", "pedcyc": "pedestrian and cyclist crashes",
                       "all": "reported crashes"}
+
+
+# The columns and kinds each exported table must have. "uint" and "int" are the integer families (the
+# build picks the narrowest width, so the width may change); the event table's yearly columns follow
+# the event window and are added by `expected_schema`.
+_COUNTS = {name: "uint" for name in ["n_all", "n_injury", "n_pedcyc", "n_ped", "n_cyc", "n_mot", "n_fatal"]}
+EXPECTED_SCHEMA = {
+    "crash_cube": {"year": "uint", "month": "uint", "borough": "category", "factor": "category",
+                   "hour_band": "category", "near": "category", **_COUNTS},
+    "hour_cube": {"year": "uint", "borough": "category", "factor": "category", "weekday": "uint",
+                  "hour": "uint", "near": "category", **_COUNTS},
+    "zip_cube": {"zip": "category", "year": "uint", "factor": "category", "hour_band": "category",
+                 "near": "category", **_COUNTS},
+    "map_grid": {"cell": "uint", "year": "uint", "borough": "category", "factor": "category",
+                 "hour_band": "category", "near": "category", **_COUNTS},
+    "housing_cube": {"borough": "category", "zip": "category", "year": "uint", "construction_type": "category",
+                     "size_band": "category", "is_located": "bool", "buildings": "uint", "total_units": "uint",
+                     "affordable_units": "uint", "deep_affordable_units": "uint"},
+    "zip_year": {"zip": "category", "year": "int", "borough": "category", "buildings_completed": "uint",
+                 "units_completed": "uint", "affordable_units_completed": "uint", "deep_affordable_units": "uint",
+                 "new_construction_units": "uint", "preservation_units": "uint", "cum_affordable_units": "uint",
+                 "cum_deep_affordable_units": "uint", "crashes": "uint", "injury_crashes": "uint",
+                 "persons_injured": "uint", "persons_killed": "uint", "ped_cyc_crashes": "uint",
+                 "crashes_zip_imputed": "uint", "injury_crashes_zip_imputed": "uint"},
+    "sites": {"site_id": "int", "cluster_id": "int", "project_name": "object", "borough": "category",
+              "zip": "category", "lat": "float", "lon": "float", "start_year": "int", "completion_year": "float",
+              "construction_type": "category", "size_band": "category", "total_units": "int",
+              "affordable_units": "int", "baseline_crashes": "float", "borough_percentile": "float"},
+    "event_sites": {"site_id": "int", "cohort": "int", "cluster_id": "int", "borough": "category",
+                    "construction_type": "category", "size_band": "category", "total_units": "int",
+                    "treated": "bool"},
+    "city_year": {"year": "int", "crashes": "int", "injury_crashes": "int", "persons_injured": "int",
+                  "persons_killed": "int", "ped_cyc_crashes": "int", "injury_share": "float",
+                  "deaths_per_1000_injury_crashes": "float", "crash_index": "float", "injury_crash_index": "float"},
+    "robustness": {"check": "object", "variant": "object", "kind": "object", "keeps_screen": "bool",
+                   "n_treated": "int", "n_comparison": "int", "n_comparison_sites": "int",
+                   "n_treated_dropped": "int", "n_comparison_dropped": "int", "n_resampled_units": "int",
+                   "n_treated_clusters": "int", "n_strata": "int", "treated_change": "float",
+                   "comparison_change": "float", "estimate": "float", "low": "float", "high": "float",
+                   "p_value": "float", "percent_change": "float", "percent_low": "float",
+                   "percent_high": "float", "interval_excludes_zero": "bool"},
+    "cleaning_log": {"dataset": "object", "rule": "object", "action": "object", "rows_before": "int",
+                     "rows_after": "int", "affected": "int", "reason": "object"},
+}
+EVENT_OUTCOME_PREFIXES = ["injury", "all", "pedcyc"]
+
+
+class DataContractError(ValueError):
+    """The files in app/data/ do not match what this code reads. Rebuild with tools/build_app_data.py."""
+
+
+def dtype_kind(dtype) -> str:
+    """The family of a pandas dtype: category, uint, int, float, bool or object."""
+    if isinstance(dtype, pd.CategoricalDtype):
+        return "category"
+    if pd.api.types.is_bool_dtype(dtype):
+        return "bool"
+    if pd.api.types.is_unsigned_integer_dtype(dtype):
+        return "uint"
+    if pd.api.types.is_integer_dtype(dtype):
+        return "int"
+    if pd.api.types.is_float_dtype(dtype):
+        return "float"
+    return "object"
+
+
+def expected_schema(name: str, event_window: int) -> dict[str, str]:
+    """Expected columns of one table; the event table's yearly columns follow the event window."""
+    columns = dict(EXPECTED_SCHEMA[name])
+    if name == "event_sites":
+        for prefix in EVENT_OUTCOME_PREFIXES:
+            for rel_year in range(-event_window, event_window + 1):
+                columns[f"{prefix}_{rel_year:+d}"] = "uint"
+    return columns
+
+
+def check_table(name: str, frame: pd.DataFrame, event_window: int, recorded: dict | None) -> None:
+    """Raise DataContractError naming the table and column when a table is not what the code reads."""
+    fix = "rebuild with: python tools/build_app_data.py"
+    expected = expected_schema(name, event_window)
+    for column, kind in expected.items():
+        if column not in frame.columns:
+            raise DataContractError(f"table '{name}' has no column '{column}'; {fix}")
+        actual = dtype_kind(frame[column].dtype)
+        if actual != kind:
+            raise DataContractError(f"table '{name}', column '{column}' is {frame[column].dtype} ({actual}), "
+                                    f"expected {kind}; {fix}")
+    extra = [column for column in frame.columns if column not in expected]
+    if extra:
+        raise DataContractError(f"table '{name}' has unexpected column '{extra[0]}'; {fix}")
+    if recorded is not None:
+        for column, dtype in recorded.items():
+            if column in frame.columns and str(frame[column].dtype) != dtype:
+                raise DataContractError(f"table '{name}', column '{column}' is {frame[column].dtype} but "
+                                        f"meta.json recorded {dtype}; the files and meta.json are from different builds")
 
 
 # The exported tables carry the notebook's spelling of one factor label; the site shows US spelling.
@@ -97,18 +192,29 @@ class Store:
 
 @lru_cache(maxsize=1)
 def load(data_dir: Path = DATA_DIR) -> Store:
-    """Read every exported file. Raises FileNotFoundError with the fix if the data was never built."""
+    """Read every exported file and check it against the schema the code expects.
+
+    Raises FileNotFoundError with the fix if the data was never built, and DataContractError
+    (naming the table and column) if a table has a missing, unexpected or wrongly typed column.
+    """
+    global REL_YEARS
     if not (data_dir / "meta.json").exists():
         raise FileNotFoundError(f"{data_dir} has no data. Run: python tools/build_app_data.py")
-
-    def table(name: str) -> pd.DataFrame:
-        return pd.read_parquet(data_dir / f"{name}.parquet")
 
     meta = json.loads((data_dir / "meta.json").read_text(encoding="utf-8"))
     constants = meta["constants"]
     if (constants["year_start"], constants["year_end"]) != (filter_model.YEAR_START, filter_model.YEAR_END):
         raise ValueError(f"app/data covers {constants['year_start']} to {constants['year_end']} but the "
                          "filters are built for another window; rebuild the data or update app/filters.py")
+    window = int(constants["event_window"])
+    recorded = meta.get("schema", {})
+
+    def table(name: str) -> pd.DataFrame:
+        frame = pd.read_parquet(data_dir / f"{name}.parquet")
+        check_table(name, frame, window, recorded.get(name))
+        return frame
+
+    REL_YEARS = list(range(-window, window + 1))
     filter_model.configure(constants)
     store = Store(
         meta=meta, results=json.loads((data_dir / "results.json").read_text(encoding="utf-8")),
@@ -342,7 +448,8 @@ def event_study(store: Store, filters: Filters) -> dict:
     """Crashes within the buffer of sites by year relative to completion, completed against not-yet-completed.
 
     Uses the borough, construction-type, size and who-was-harmed filters. Cached, because each
-    call runs up to four bootstraps.
+    call runs up to four bootstraps. `n_comparison` counts rows (a comparison site has one per cohort it
+    serves) and `n_comparison_sites` counts sites; a group needs MIN_GROUP_N unique sites to be estimated.
     """
     return _event_study(store, filters.boroughs, filters.construction, filters.sizes, event_outcome(filters))
 
@@ -367,18 +474,27 @@ def _event_study(store: Store, boroughs: tuple, construction: tuple, sizes: tupl
     before = counts[:, :len(PRE_YEARS)].sum(axis=1)
     after = counts[:, -len(POST_YEARS):].sum(axis=1)
     cohorts, clusters = sample["cohort"].to_numpy(), sample["cluster_id"].to_numpy()
+    site_ids = sample["site_id"].to_numpy()
     n_by_type = {name: int((treated & (kind == name)).sum()) for name in wanted_types}
-    n_comparison = int((~treated).sum())
-    result = {"outcome": outcome, "noun": EVENT_OUTCOME_NOUN[outcome], "rel_years": REL_YEARS,
-              "n_by_type": n_by_type, "n_comparison": n_comparison, "treated": {}, "difference": None}
-
-    usable = [name for name in wanted_types if n_by_type[name] >= MIN_GROUP_N]
-    if not usable or n_comparison < MIN_GROUP_N:
-        result["empty"] = True
-        return result
 
     def rows_for(name):
         return ~treated | (kind == name)
+
+    # Counted on what each estimate uses: a cohort with sites on one side only is left out of it.
+    sizes = {name: stats.used_sizes(site_ids[rows_for(name)], treated[rows_for(name)], cohorts[rows_for(name)],
+                                    clusters[rows_for(name)]) for name in wanted_types}
+    result = {"outcome": outcome, "noun": EVENT_OUTCOME_NOUN[outcome], "rel_years": REL_YEARS,
+              "n_by_type": n_by_type, "n_comparison": int((~treated).sum()),
+              "n_comparison_sites": int(pd.unique(site_ids[~treated]).size),
+              "n_clusters": int(pd.unique(clusters).size),
+              "n_treated_clusters": int(pd.unique(clusters[treated]).size),
+              "treated": {}, "difference": None}
+
+    usable = [name for name in wanted_types
+              if min(sizes[name]["n_treated_sites"], sizes[name]["n_comparison_sites"]) >= MIN_GROUP_N]
+    if not usable:
+        result["empty"] = True
+        return result
 
     if len(usable) == 2:
         # Both types against the shared comparison sites in one joint bootstrap (the notebook's RQ5).
@@ -392,13 +508,14 @@ def _event_study(store: Store, boroughs: tuple, construction: tuple, sizes: tupl
                                                     cohorts[rows], clusters[rows])}
     for name in usable:
         rows = rows_for(name)
-        profile = stats.event_profile(counts[rows], treated[rows], cohorts[rows], clusters[rows], len(PRE_YEARS))
+        profile = stats.event_profile(counts[rows], treated[rows], cohorts[rows], clusters[rows], len(PRE_YEARS),
+                                      site_ids=site_ids[rows])
         result["treated"][name] = {"profile": profile["treated"], "did": estimates[name]}
         if len(usable) == 1:
             result["comparison"] = profile["comparison"]
     if len(usable) == 2:
         # One comparison line for the chart, weighted by the cohort mix of all treated sites shown.
-        pooled = stats.event_profile(counts, treated, cohorts, clusters, len(PRE_YEARS))
+        pooled = stats.event_profile(counts, treated, cohorts, clusters, len(PRE_YEARS), site_ids=site_ids)
         result["comparison"] = pooled["comparison"]
     return result
 
@@ -408,7 +525,8 @@ def site_selection(store: Store, filters: Filters) -> dict:
 
     Uses the borough, construction-type and size filters. Sites are the ones started after the
     baseline (see meta.json); the year filter does not apply. The bootstrap resamples site clusters
-    (`cluster_id`, sites linked within the buffer), as the notebook does.
+    (`cluster_id`, sites linked within the buffer), as the notebook does. `one_vote` repeats the mean
+    with each cluster counted once; it is NaN below MIN_GROUP_N clusters.
     """
     return _site_selection(store, filters.boroughs, filters.construction, filters.sizes)
 
@@ -430,12 +548,14 @@ def _site_selection(store: Store, boroughs: tuple, construction: tuple, sizes: t
         return result
     percentiles = sites["borough_percentile"].to_numpy(dtype=float)
     boot = stats.bootstrap_ci(stats.mean_percentile_excess, percentiles, clusters=sites["cluster_id"].to_numpy())
+    one_vote = stats.one_vote_per_cluster(percentiles, sites["cluster_id"].to_numpy(), min_clusters=MIN_GROUP_N)
     n_bins = 100 // PERCENTILE_BIN_WIDTH
     bins = np.clip((percentiles // PERCENTILE_BIN_WIDTH).astype(int), 0, n_bins - 1)
     result.update({
         "excess": boot["estimate"], "low": boot["low"], "high": boot["high"],
         "mean_percentile": stats.NEUTRAL_PERCENTILE + boot["estimate"],
         "share_above_median": float((percentiles > stats.NEUTRAL_PERCENTILE).mean() * 100),
+        "one_vote": one_vote,
         "n_blocks": boot["n_clusters"],
         "cluster_unit": "site clusters (sites within the buffer of each other)",
         "bin_share": np.bincount(bins, minlength=n_bins) / len(percentiles) * 100,

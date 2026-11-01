@@ -13,9 +13,9 @@ from dash import dcc, html
 from app import charts
 from app.data import Store
 from app.filters import YEAR_END, YEAR_START, buffer_m
-from app.stats import NEUTRAL_PERCENTILE
+from app.stats import NEUTRAL_PERCENTILE, level_text
 from app.story_text import (SAME_AS_ZERO, finding_extras, findings_lead, interval_level_text, interval_text,
-                            number_word, reading_label, robustness_text, signed, unit_digits, zip_level_text)
+                            number_word, ordinal, reading_label, robustness_text, signed, unit_digits, zip_level_text)
 from app.theme import GRAPH_CONFIG
 
 
@@ -33,6 +33,7 @@ def hero(store: Store) -> html.Section:
     rows, questions = store.meta["rows"], store.results["questions"]
     after, where = questions["RQ3"], questions["RQ7"]
     baseline = store.meta["constants"]["baseline_years"]
+    one_vote = store.results["detail"]["rq7"]["one_vote"]
     return html.Section(className="hero", children=[
         html.P(f"New York City, {YEAR_START} to {YEAR_END}", className="eyebrow"),
         html.H1("Do injury crashes rise around affordable housing once it opens?"),
@@ -59,7 +60,11 @@ def hero(store: Store) -> html.Section:
                        f"crashes in {baseline[0]} to {baseline[1]}, before the project started, the average site sits "
                        f"at the {NEUTRAL_PERCENTILE + where['estimate']:.0f}th percentile. A typical street point is "
                        f"at the {NEUTRAL_PERCENTILE}th (95% interval {NEUTRAL_PERCENTILE + where['low']:.0f} to "
-                       f"{NEUTRAL_PERCENTILE + where['high']:.0f}, {where['n']:,} sites)."),
+                       f"{NEUTRAL_PERCENTILE + where['high']:.0f}, {where['n']:,} sites). Citywide the direction holds and the "
+                       f"size depends on the weighting: counting each cluster of linked sites once gives the "
+                       f"{ordinal(NEUTRAL_PERCENTILE + one_vote['estimate'])} percentile "
+                       f"({NEUTRAL_PERCENTILE + one_vote['low']:.0f} to {NEUTRAL_PERCENTILE + one_vote['high']:.0f}, "
+                       f"{one_vote['n']:,} clusters)."),
             ]),
         ]),
     ])
@@ -100,25 +105,18 @@ def _finding_row(key: str, item: dict, extra: str | None) -> html.Li:
             html.P([html.Span(signed(item["estimate"], digits), className="finding-estimate"),
                     html.Span(item["unit"], className="finding-unit")]),
             _interval_mark(item["low"], item["estimate"], item["high"]),
-            html.P(f"{item['level']:.0%} interval {interval_text(item, digits)}", className="finding-range"),
+            html.P(f"{level_text(item['level'])} interval {interval_text(item, digits)}", className="finding-range"),
             html.P(f"n = {item['n']:,} {item['n_unit']}", className="finding-range"),
             html.P(reading, className=reading_class),
         ]),
     ])
 
 
-def findings(store: Store) -> html.Section:
-    """Ten questions, each with its estimate, interval, n and a sentence that says what it shows."""
+def surprise_paragraphs(store: Store) -> list[html.P]:
+    """The two checks made before any question: the total count, and the clusters of nearby sites."""
     questions, facts = store.results["questions"], store.results["facts"]
     largest = store.results["detail"]["largest_clusters"]
-    extras = finding_extras(store)
-    return html.Section(id="findings", className="band", children=[
-        html.H2(f"{number_word(len(questions)).capitalize()} questions and what the records show"),
-        html.P(findings_lead(questions), className="section-lead"),
-        html.P(f"{interval_level_text(questions)} If it crosses the vertical zero line, the records are "
-               "compatible with no change.", className="section-lead"),
-        html.Ul([_finding_row(key, item, extras.get(key)) for key, item in questions.items()], className="findings"),
-        html.H3("What surprised us", className="sub-heading"),
+    return [
         html.P(f"Before any question, we checked how the total count behaves. Counted as all crashes, the streets "
                f"around the new buildings of RQ3 fall by {abs(facts['all_crash_change']):.0f}% after completion, and "
                "the not-yet-completed comparison sites fall by almost the same amount (the change relative to "
@@ -132,14 +130,29 @@ def findings(store: Store) -> html.Section:
                f"of {facts['treated_candidates']:,} completed sites had no other completion nearby during their "
                f"window, and only {questions['RQ3']['n']:,} of those are new construction. The before and after "
                "comparison therefore describes the less dense edges of the program.", className="prose"),
+    ]
+
+
+def findings(store: Store) -> html.Section:
+    """Ten questions, each with its estimate, interval, n and a sentence that says what it shows."""
+    questions = store.results["questions"]
+    extras = finding_extras(store)
+    return html.Section(id="findings", className="band", children=[
+        html.H2(f"{number_word(len(questions)).capitalize()} questions and what the records show"),
+        html.P(findings_lead(questions), className="section-lead"),
+        html.P(f"{interval_level_text(questions)} If it crosses the vertical zero line, the records are "
+               "compatible with no change.", className="section-lead"),
+        html.Ul([_finding_row(key, item, extras.get(key)) for key, item in questions.items()], className="findings"),
+        html.H3("What surprised us", className="sub-heading"),
+        *surprise_paragraphs(store),
     ])
 
 
 # ---------------------------------------------------------------------------------------------
 # Limits and impact
 # ---------------------------------------------------------------------------------------------
-def limits(store: Store) -> html.Section:
-    """What the data cannot tell us, with the size of each gap."""
+def limit_items(store: Store) -> list[tuple[str, str]]:
+    """(title, text) of each thing the data cannot tell us, with the size of each gap."""
     facts, limit = store.results["facts"], store.results["limits"]
     central = store.results["questions"]["RQ3"]
     # The holdout accuracy of the ZIP recovery is recorded in the cleaning log by the notebook.
@@ -191,6 +204,12 @@ def limits(store: Store) -> html.Section:
          f"{limit['robustness_intervals']} versions of the main comparison. With that many 95% intervals, some "
          "will exclude zero by chance. We adjusted inside each question and did not adjust across the project."),
     ]
+    return items
+
+
+def limits(store: Store) -> html.Section:
+    """What the data cannot tell us, with the size of each gap."""
+    items = limit_items(store)
     return html.Section(id="limits", className="band", children=[
         html.H2("What this data cannot tell us"),
         html.Div([html.Div([html.H3(title), html.P(text)], className="limit") for title, text in items],
@@ -198,15 +217,16 @@ def limits(store: Store) -> html.Section:
     ])
 
 
-def impact(store: Store) -> html.Section:
-    """Who could use the findings, and what they would do differently."""
+def impact_items(store: Store) -> list[tuple[str, str]]:
+    """(who, what) for each body that could use the findings and what it would do differently."""
     after, facts = store.results["questions"]["RQ3"], store.results["facts"]
     new_sites = store.results["detail"]["rq7_new_sites"]
     items = [
         ("Department of Transportation and Vision Zero",
          f"The housing table gives each building's start date as well as its completion date, and "
-         f"{new_sites['share_above_borough_median_pct']:.0f}% of the new-construction sites stood above the "
-         f"median street point of their borough for injury crashes before work began (a median of "
+         f"{new_sites['share_above_borough_median_pct']:.0f}% of the new-construction sites "
+         f"({new_sites['share_clusters_above_borough_median_pct']:.0f}% of their clusters of linked sites) stood above "
+         f"the median street point of their borough for injury crashes before work began (a median of "
          f"{new_sites['median_baseline_crashes']:.0f} within {buffer_m()} m over three years, against "
          f"{new_sites['median_baseline_crashes_reference']:.0f} at the median street point). That record is "
          "available when a project starts, so street redesign could be timed to finish before tenants arrive. "
@@ -222,7 +242,8 @@ def impact(store: Store) -> html.Section:
          "after windows more exact."),
         ("Community boards",
          f"Before a proposed new building opens, {new_sites['share_above_borough_median_pct']:.0f}% of "
-         "new-construction sites stood on streets above their borough's median for injury crashes. A board can "
+         f"new-construction sites, and {new_sites['share_clusters_above_borough_median_pct']:.0f}% of their clusters, "
+         "stood on streets above their borough's median for injury crashes. A board can "
          "ask for street improvements on the strength of that record, without making the request depend on the "
          "building. These results say nothing about a single corner."),
         ("Residents",
@@ -233,10 +254,19 @@ def impact(store: Store) -> html.Section:
          "The crash reports cover collisions involving a motor vehicle, so harm to people outside cars may be "
          "understated."),
     ]
+    return items
+
+
+IMPACT_LEAD = ("The crash record of a block is known before a financed building opens on it. The people who "
+               "move in arrive on a street that already had that record.")
+
+
+def impact(store: Store) -> html.Section:
+    """Who could use the findings, and what they would do differently."""
+    items = impact_items(store)
     return html.Section(id="impact", className="band", children=[
         html.H2("What this means for the city"),
-        html.P("The crash record of a block is known before a financed building opens on it. The people who "
-               "move in arrive on a street that already had that record.", className="section-lead"),
+        html.P(IMPACT_LEAD, className="section-lead"),
         html.Dl([part for who, what in items for part in (html.Dt(who), html.Dd(what))], className="audiences"),
     ])
 
@@ -256,41 +286,63 @@ def _cleaning_table(store: Store) -> html.Div:
                     className="table-wrap", tabIndex=0, role="region", **{"aria-label": "Cleaning log"})
 
 
-def data_and_method(store: Store) -> html.Section:
-    """The two datasets, how they were joined, what was cleaned, and the checks behind the result."""
+def join_paragraphs(store: Store) -> list[html.P]:
+    """The two datasets, the two ways they are linked, and what cleaning dropped."""
     meta, rows = store.meta, store.meta["rows"]
     housing, crashes = meta["datasets"]["housing"], meta["datasets"]["crashes"]
     as_of, constants = meta["data_as_of"], meta["constants"]
     log = store.cleaning_log
     dropped = int((log["rows_before"] - log["rows_after"])[log["dataset"].isin(["housing", "crashes"])].sum())
+    return [
+        html.P(["Housing: ", html.A(housing["name"], href=housing["url"], target="_blank", rel="noopener"),
+                f", {rows['housing']:,} buildings. Transportation: ",
+                html.A(crashes["name"], href=crashes["url"], target="_blank", rel="noopener"),
+                f", {rows['crashes']:,} crashes from {as_of['earliest_crash'][:4]} to "
+                f"{as_of['latest_crash'][:4]}. Both come from NYC Open Data."]),
+        html.P(f"We link them in two ways. A ZIP code by year panel ({rows['panel_zips']} ZIP codes, "
+               f"{rows['zip_year']:,} rows) puts completed units next to crash counts. A distance join "
+               f"marks every crash within {constants['buffer_m']} m of one of the {rows['sites']:,} "
+               f"buildings that have coordinates. {rows['crashes_near_a_site']:,} crashes are that close "
+               "to a site."),
+        html.P(("No crash row and no building row was dropped in cleaning. " if dropped == 0 else
+                f"{dropped:,} rows were dropped in cleaning. ") +
+               "Problems are flagged or filled with a rule, and each rule is in the log below."),
+    ]
+
+
+def reporting_note(store: Store) -> str:
+    """How to read the chart of crash reports by year, 2019 = 100."""
+    facts = store.results["facts"]
+    return (f"Citywide crashes per year, 2019 = 100. Reports of crashes without injuries fell sharply in "
+            f"2020 and kept falling: all reported crashes stood at {facts['crash_index']:.0f} "
+            f"in 2025. Injury crashes fell less and stood at "
+            f"{facts['injury_index']:.0f}. A before and after comparison on all "
+            "crashes would mostly measure the change in reporting.")
+
+
+def robustness_chart_note(store: Store) -> str:
+    """How to read the forest plot of the main result under each change of method."""
+    return ("Change in injury crashes around new buildings after completion, compared with the same change at "
+            f"not-yet-completed sites, in percent. The bars are 95% intervals from {store.meta['constants']['n_boot']:,} "
+            "resamples of whole clusters of nearby sites. The Outcome row counts all crashes. The comparison "
+            "subset rows are unadjusted cuts. Hover a row for its sites, comparison rows and clusters.")
+
+
+def data_and_method(store: Store) -> html.Section:
+    """The two datasets, how they were joined, what was cleaned, and the checks behind the result."""
+    log = store.cleaning_log
     return html.Section(id="data", className="band", children=[
         html.H2("The data and how we joined it"),
         html.Div(className="method", children=[
             html.Div([
                 html.H3("Two datasets with no shared key"),
-                html.P(["Housing: ", html.A(housing["name"], href=housing["url"], target="_blank", rel="noopener"),
-                        f", {rows['housing']:,} buildings. Transportation: ",
-                        html.A(crashes["name"], href=crashes["url"], target="_blank", rel="noopener"),
-                        f", {rows['crashes']:,} crashes from {as_of['earliest_crash'][:4]} to "
-                        f"{as_of['latest_crash'][:4]}. Both come from NYC Open Data."]),
-                html.P(f"We link them in two ways. A ZIP code by year panel ({rows['panel_zips']} ZIP codes, "
-                       f"{rows['zip_year']:,} rows) puts completed units next to crash counts. A distance join "
-                       f"marks every crash within {constants['buffer_m']} m of one of the {rows['sites']:,} "
-                       f"buildings that have coordinates. {rows['crashes_near_a_site']:,} crashes are that close "
-                       "to a site."),
-                html.P(("No crash row and no building row was dropped in cleaning. " if dropped == 0 else
-                        f"{dropped:,} rows were dropped in cleaning. ") +
-                       "Problems are flagged or filled with a rule, and each rule is in the log below."),
+                *join_paragraphs(store),
                 html.Details([html.Summary(f"Cleaning log, {len(log)} rules"), _cleaning_table(store)]),
             ]),
             html.Div([
                 html.H3("Why we count injury crashes"),
                 _graph("fig-reporting", charts.reporting_break_figure(store.city_year), "graph-small"),
-                html.P(f"Citywide crashes per year, 2019 = 100. Reports of crashes without injuries fell sharply in "
-                       f"2020 and kept falling: all reported crashes stood at {store.results['facts']['crash_index']:.0f} "
-                       f"in 2025. Injury crashes fell less and stood at "
-                       f"{store.results['facts']['injury_index']:.0f}. A before and after comparison on all "
-                       "crashes would mostly measure the change in reporting.", className="chart-note"),
+                html.P(reporting_note(store), className="chart-note"),
             ]),
         ]),
         html.H3("How the main result changes with our choices", className="sub-heading"),
@@ -299,10 +351,7 @@ def data_and_method(store: Store) -> html.Section:
         html.Div(_graph("fig-robustness", charts.robustness_figure(store.robustness), "graph-forest"),
                  className="scroll-x", tabIndex=0, role="region",
                  **{"aria-label": "Chart of the main result under each change of method"}),
-        html.P("Change in injury crashes around new buildings after completion, compared with the same change at "
-               f"not-yet-completed sites, in percent. The bars are 95% intervals from {constants['n_boot']:,} "
-               "resamples of whole clusters of nearby sites. The Outcome row counts all crashes. Hover a row for "
-               "its sample.", className="chart-note"),
+        html.P(robustness_chart_note(store), className="chart-note"),
     ])
 
 

@@ -88,10 +88,7 @@ BUFFER_M = 250              # "near a building" = within 250 m, roughly three sh
 
 # --- Analysis ---------------------------------------------------------------------------------
 EVENT_WINDOW = 3            # years compared before and after a building's completion
-N_BOOT = 1000               # bootstrap resamples behind every confidence interval
-CI_LEVEL = 0.95
 MIN_GROUP_N = 30            # no statistic is reported for a group smaller than this
-SEED = 42                   # one seed, so every random step is repeatable
 
 # --- Years derived from the study window -----------------------------------------------------
 BREAK_YEAR = 2020                       # first year of the reporting change (Section 3)
@@ -99,6 +96,9 @@ INDEX_BASE_YEAR = BREAK_YEAR - 1        # last full year before the break; indic
 N_TEST_YEARS = 3                        # study years held out of every forecast fit
 FIRST_TEST_YEAR = YEAR_END - N_TEST_YEARS + 1   # first held-out year
 BASELINE_YEARS = (YEAR_START, YEAR_START + EVENT_WINDOW - 1)   # first and last year of the pre-construction baseline
+
+# %%
+# INLINE-CONSTANTS: app/stats.py
 
 # %% [markdown]
 # ### 1.3 Plot style

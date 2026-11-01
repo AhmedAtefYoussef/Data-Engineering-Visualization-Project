@@ -34,7 +34,10 @@
 #   averaged with treated counts as weights. A stratum without both arms is dropped and counted.
 #   `type_contrast` does this for two treated types against one shared control group in a single
 #   bootstrap, so their difference is paired. `event_profile` gives the indexed yearly means
-#   behind the event charts.
+#   behind the event charts. `used_sizes` counts the rows, unique sites and clusters behind a
+#   comparison: a comparison site has one row per cohort it serves, so rows are not sites.
+# - `one_vote_per_cluster` repeats the mean percentile of RQ7 with each cluster of linked sites
+#   counted once. `level_text` prints an interval level (95%, 98.75%, 99.44%).
 
 # %%
 # INLINE: app/stats.py
@@ -262,7 +265,7 @@ def describe_effect(estimate, low, high, unit, n, subject="The estimate", n_unit
         return f"{subject} could not be estimated reliably ({sample}), so nothing is concluded from it."
     reference = "zero" if null_value == 0 else f"{null_value:g}"
     unit_text = f" {unit}" if unit else ""
-    opening = (f"{subject} is {estimate:+.{digits}f}{unit_text} ({PERCENT * level:.0f}% interval "
+    opening = (f"{subject} is {estimate:+.{digits}f}{unit_text} ({level_text(level)} interval "
                f"{low:+.{digits}f} to {high:+.{digits}f}, {sample})")
     if low <= null_value <= high:
         return f"{opening}. The interval includes {reference}."

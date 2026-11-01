@@ -322,7 +322,7 @@ def _link_housing_to_location(parsed: ParsedQuery) -> None:
 
 def parse_query(text: str | None) -> ParsedQuery:
     """Parse a free-text query into control values, the pieces understood and the words left over."""
-    text = (text or "")[:MAX_QUERY_CHARS]   # a search is a few words; a long paste is cut, not parsed
+    text = (text if isinstance(text, str) else "")[:MAX_QUERY_CHARS]   # a long paste is cut, not parsed
     parsed = ParsedQuery(text=text)
     remaining = " " + re.sub(r"[,;:!?()\"']", " ", (text or "").lower()) + " "
     remaining, notes = _negated_terms(remaining)

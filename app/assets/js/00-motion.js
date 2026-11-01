@@ -1,0 +1,275 @@
+/* The page's motion, as window.NYC. Text stays plain and readable until this script improves it, and it does nothing
+   but count-free final states under prefers-reduced-motion.
+
+     NYC.onMount(selector, fn)  runs fn(element) once per matching element, whenever it appears (Dash mounts late)
+     NYC.reducedMotion()        true when the reader asked for less motion
+     NYC.easeOut(t)             the page's settle curve
+     NYC.easeInOut(t)           a slow start and a slow landing, for things that travel
+     NYC.countUp(element)       rolls a [data-countup] figure into place, digit by digit, ending exactly on its text
+
+   Declared in the markup:
+     data-kinetic="words"       words rise out of a mask when the element enters the window
+     data-kinetic="lines"       the element lifts in
+     data-scrub="words"         words light up with the scroll position
+     data-wave                  a wave runs through the letters on hover
+     .button                    a press sends a soft glow from the finger (the hover is pure CSS: 20-components.css)
+     .nav                       a lit pill glides under the link that is pointed at, or the section in view
+     .spot                      a soft light follows the pointer
+     data-tint on a section     the page's ground drifts to that tint while it is in view */
+(function () {
+  "use strict";
+
+  var NYC = window.NYC = window.NYC || {};
+  var motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var fine = window.matchMedia("(hover: hover) and (pointer: fine)");
+  var ROLL_MS = 1500, ROLL_STAGGER_MS = 70, SCRUB_LOW = 0.2, SCRUB_SOFT = 5;
+  // One family of night blues, so the coral and the gold read the same on every chapter.
+  var TINTS = { midnight: "#0a0d1a", harbor: "#081521", plum: "#0d0f22", ember: "#0e1220" };
+
+  NYC.reducedMotion = function () { return motion.matches; };
+  NYC.easeOut = function (t) { return 1 - Math.pow(1 - t, 4); };
+  NYC.easeInOut = function (t) { return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2; };
+
+  var watchers = [], mounted = new WeakMap(), pending = false;
+  function scan() {
+    watchers.forEach(function (watcher) {
+      document.querySelectorAll(watcher.selector).forEach(function (element) {
+        var seen = mounted.get(element) || [];
+        if (seen.indexOf(watcher) >= 0) { return; }
+        seen.push(watcher);
+        mounted.set(element, seen);
+        watcher.fn(element);
+      });
+    });
+  }
+  NYC.onMount = function (selector, fn) { watchers.push({ selector: selector, fn: fn }); scan(); };
+  function schedule() {
+    if (pending) { return; }
+    pending = true;
+    window.setTimeout(function () { pending = false; scan(); }, 40);   // a timer, not rAF: rAF stops in a hidden tab
+  }
+
+  /* Enter the window once. */
+  var entrance = "IntersectionObserver" in window ? new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (!entry.isIntersecting) { return; }
+      entrance.unobserve(entry.target);
+      entry.target.classList.add("is-in");
+      if (entry.target.__onEnter) { entry.target.__onEnter(); }
+    });
+  }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 }) : null;
+  function whenSeen(element, fn) {
+    if (!entrance) { element.classList.add("is-in"); if (fn) { fn(); } return; }
+    if (fn) { element.__onEnter = fn; }
+    entrance.observe(element);
+  }
+
+  /* Replace an element's text with spans. Its accessible name stays the whole sentence. */
+  function splitWords(element, wrap) {
+    var text = element.textContent;
+    if (!text.trim() || element.children.length) { return null; }
+    element.setAttribute("aria-label", text);
+    if (!element.getAttribute("role") && element.tagName === "P") { element.setAttribute("role", "paragraph"); }
+    element.textContent = "";
+    var words = [];
+    text.trim().split(/\s+/).forEach(function (word, index, all) {
+      var node = wrap(word, index);
+      node.setAttribute("aria-hidden", "true");
+      words.push(node);
+      element.appendChild(node);
+      if (index < all.length - 1) { element.appendChild(document.createTextNode(" ")); }
+    });
+    return words;
+  }
+
+  NYC.onMount("[data-kinetic='words']", function (element) {
+    if (NYC.reducedMotion()) { return; }
+    var done = splitWords(element, function (word, index) {
+      var outer = document.createElement("span"), inner = document.createElement("span");
+      outer.className = "kw"; inner.className = "kw-i";
+      inner.style.setProperty("--i", index);
+      inner.textContent = word;
+      outer.appendChild(inner);
+      return outer;
+    });
+    if (done) { whenSeen(element); }
+  });
+
+  NYC.onMount("[data-kinetic='lines']", function (element) {
+    if (NYC.reducedMotion()) { return; }
+    element.classList.add("lift");
+    whenSeen(element);
+  });
+  NYC.onMount(".lift", function (element) { whenSeen(element); });
+
+  /* Words that light up as the paragraph moves through the window. */
+  var scrubbing = [];
+  NYC.onMount("[data-scrub='words']", function (element) {
+    if (NYC.reducedMotion()) { return; }
+    var words = splitWords(element, function (word) {
+      var span = document.createElement("span");
+      span.className = "sw"; span.textContent = word;
+      return span;
+    });
+    if (words) { scrubbing.push({ element: element, words: words }); onScroll(); }
+  });
+  function updateScrub(height) {
+    scrubbing.forEach(function (item) {
+      var box = item.element.getBoundingClientRect();
+      if (box.bottom < -height * 0.2 || box.top > height * 1.2) { return; }
+      var progress = (height * 0.9 - box.top) / (height * 0.5 + box.height);
+      var lit = Math.max(0, Math.min(1, progress)) * (item.words.length + SCRUB_SOFT);
+      item.words.forEach(function (word, index) {
+        word.style.opacity = SCRUB_LOW + (1 - SCRUB_LOW) * Math.max(0, Math.min(1, (lit - index) / SCRUB_SOFT));
+      });
+    });
+  }
+
+  /* Figures roll into place when seen: each digit is a reel that spins down to its value, the right-most first,
+     like the drum of a counter, while the figure comes into focus. The element's own nodes are put back at the end,
+     so React still owns the text it rendered and the accessible name never changes. */
+  NYC.countUp = function (element) {
+    var final = element.getAttribute("data-final") || element.textContent;
+    if (NYC.reducedMotion() || element.__rolling || element.textContent !== final) { return; }
+    element.__rolling = true;
+    var original = Array.prototype.slice.call(element.childNodes), reels = [], digits = 0;
+    var holder = document.createElement("span");
+    holder.className = "od"; holder.setAttribute("aria-hidden", "true");
+    Array.prototype.forEach.call(final, function (character) { if (/\d/.test(character)) { digits++; } });
+    var seen = 0;
+    Array.prototype.forEach.call(final, function (character) {
+      var cell = document.createElement("span");
+      if (/\d/.test(character)) {
+        var value = +character, strip = document.createElement("span"), spins = 1 + (digits - seen) % 2;
+        cell.className = "od-cell"; strip.className = "od-strip";
+        for (var k = 0; k <= spins * 10 + value; k++) {
+          var digit = document.createElement("span");
+          digit.className = "od-d"; digit.textContent = String(k % 10);
+          strip.appendChild(digit);
+        }
+        strip.style.setProperty("--to", String(spins * 10 + value));
+        strip.style.transitionDelay = ((digits - 1 - seen) * ROLL_STAGGER_MS) + "ms";
+        strip.style.transitionDuration = ROLL_MS + "ms";
+        cell.appendChild(strip);
+        reels.push(strip);
+        seen++;
+      } else {
+        cell.className = "od-c"; cell.textContent = character;
+      }
+      holder.appendChild(cell);
+    });
+    element.setAttribute("aria-label", final);
+    element.classList.add("is-rolling");
+    element.replaceChildren(holder);
+    void holder.offsetWidth;
+    element.classList.add("is-rolled");
+    window.setTimeout(function () {
+      element.replaceChildren.apply(element, original);
+      element.classList.remove("is-rolling", "is-rolled");
+      element.removeAttribute("aria-label");
+      element.__rolling = false;
+    }, ROLL_MS + digits * ROLL_STAGGER_MS + 120);
+  };
+  NYC.onMount("[data-countup]", function (element) { whenSeen(element, function () { NYC.countUp(element); }); });
+
+  /* A wave through the letters. */
+  NYC.onMount("[data-wave]", function (element) {
+    var text = element.textContent;
+    if (element.children.length || !text) { return; }
+    element.setAttribute("aria-label", text);
+    element.textContent = "";
+    Array.prototype.forEach.call(text, function (letter, index) {
+      var span = document.createElement("span");
+      span.className = "wl"; span.textContent = letter;
+      span.style.setProperty("--i", index);
+      span.setAttribute("aria-hidden", "true");
+      element.appendChild(span);
+    });
+  });
+
+  /* Hover and press, delegated so Dash re-renders never lose them. */
+  document.addEventListener("pointermove", function (event) {
+    if (!fine.matches || NYC.reducedMotion() || !event.target.closest) { return; }
+    var spot = event.target.closest(".spot");
+    if (spot) {
+      var area = spot.getBoundingClientRect();
+      spot.style.setProperty("--mx", (event.clientX - area.left) + "px");
+      spot.style.setProperty("--my", (event.clientY - area.top) + "px");
+    }
+  }, { passive: true });
+  document.addEventListener("pointerdown", function (event) {
+    var button = event.target.closest && event.target.closest(".button");
+    if (!button || NYC.reducedMotion()) { return; }
+    var box = button.getBoundingClientRect(), ripple = document.createElement("span");
+    ripple.className = "ripple"; ripple.style.left = (event.clientX - box.left) + "px"; ripple.style.top = (event.clientY - box.top) + "px";
+    ripple.setAttribute("aria-hidden", "true");
+    ripple.addEventListener("animationend", function () { ripple.remove(); });
+    button.appendChild(ripple);
+  }, { passive: true });
+
+  /* The navigation's lit pill: it rests under the section in view and glides to a link while it is pointed at. */
+  var pill = null, nav = null;
+  function placePill(link) {
+    if (!pill || !nav) { return; }
+    if (!link) { pill.style.opacity = "0"; return; }
+    pill.style.opacity = "1";
+    pill.style.width = link.offsetWidth + "px";
+    pill.style.transform = "translateX(" + (link.offsetLeft - nav.scrollLeft) + "px)";
+  }
+  function restingLink() { return nav && nav.querySelector(".nav-link[aria-current]"); }
+  NYC.onMount(".nav", function (element) {
+    nav = element;
+    pill = document.createElement("span");
+    pill.className = "nav-pill"; pill.setAttribute("aria-hidden", "true");
+    element.insertBefore(pill, element.firstChild);
+    element.addEventListener("pointerover", function (event) { var link = event.target.closest(".nav-link"); if (link) { placePill(link); } });
+    element.addEventListener("focusin", function (event) { var link = event.target.closest(".nav-link"); if (link) { placePill(link); } });
+    element.addEventListener("pointerleave", function () { placePill(restingLink()); });
+    element.addEventListener("focusout", function () { placePill(restingLink()); });
+    window.addEventListener("resize", function () { placePill(restingLink()); }, { passive: true });
+  });
+
+  /* Reading position, section in view, ground tint. */
+  var ticking = false, sections = [], links = [];
+  function update() {
+    ticking = false;
+    var doc = document.documentElement, height = window.innerHeight, top = window.scrollY;
+    var page = document.querySelector(".page");
+    if (page) { if (top > 40) { page.setAttribute("data-scrolled", ""); } else { page.removeAttribute("data-scrolled"); } }
+    var thread = document.getElementById("thread");
+    if (thread) { thread.style.setProperty("--read", Math.min(1, top / Math.max(1, doc.scrollHeight - height)).toFixed(4)); }
+    updateScrub(height);
+    var current = null;
+    sections.forEach(function (section) {
+      var box = section.getBoundingClientRect();
+      if (box.top < height * 0.45 && box.bottom > height * 0.45) { current = section; }
+    });
+    if (current) {
+      var tint = TINTS[current.getAttribute("data-tint")] || TINTS.midnight;
+      document.documentElement.style.setProperty("--tint", tint);
+      var changed = false;
+      links.forEach(function (link) {
+        var mine = link.getAttribute("href") === "#" + current.id;
+        if (mine !== link.hasAttribute("aria-current")) { changed = true; }
+        if (mine) { link.setAttribute("aria-current", "true"); } else { link.removeAttribute("aria-current"); }
+      });
+      if (changed && nav && !nav.matches(":hover")) { placePill(restingLink()); }
+    }
+  }
+  function onScroll() {
+    if (ticking) { return; }
+    ticking = true;
+    window.requestAnimationFrame(update);
+  }
+  NYC.onMount("[data-tint]", function (section) { sections.push(section); onScroll(); });
+  NYC.onMount(".nav-link", function (link) { links.push(link); });
+
+  function start() {
+    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    scan();
+    onScroll();
+  }
+  if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", start); } else { start(); }
+})();

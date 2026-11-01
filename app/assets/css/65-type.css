@@ -1,0 +1,9 @@
+/* Bodoni on a night ground, everywhere on the page. Figures use the smallest optical size and a heavier weight, so a
+   minus sign, a decimal point and the stroke of a 4 hold up at any size; display headings use a middle optical size,
+   which keeps the contrast of the face without hairlines that thin away on navy. */
+:is(.bk-big, .bk-fact-value, .bk-row-num, .bk-row-rank, .bk-year-count, .sc-value, .sc-count, .sc-hist-val, .md-count, .fd-estimate, .step-number) {
+  font-variation-settings: "opsz" 6; font-weight: 650;
+}
+:is(.fd-question, .fd-key, .bk-name, .bk-label, .bk-rank-title, .bk-part-title, .group-title, .card-head h4, .md-limit h4, .md-reader h4, .md-stage h4, .md-credit h4, .fd-intro) {
+  font-variation-settings: "opsz" 28;
+}

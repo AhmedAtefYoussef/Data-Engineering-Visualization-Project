@@ -3,7 +3,9 @@
 Each section is a Python file in jupytext "percent" format (`# %%` code cells, `# %% [markdown]`
 text cells). Sections are joined in file-name order into one self-contained notebook. A code cell
 whose only line is `# INLINE: <repo path>` is replaced by that file's code, so the statistics in
-app/stats.py exist once and the notebook still imports nothing from the repository.
+app/stats.py exist once and the notebook still imports nothing from the repository. A cell whose only
+line is `# INLINE-CONSTANTS: <repo path>` takes that file's BEGIN/END SHARED CONSTANTS block, which the
+`# INLINE` paste then leaves out, so changing a value in the notebook's Section 1 reaches the statistics.
 
     python tools/assemble_notebook.py --execute                       # full build into notebooks/
     python tools/assemble_notebook.py --sections 01 02 04 --execute --out dev.ipynb --show 04
@@ -29,6 +31,8 @@ SRC_DIR = ROOT / "tools" / "notebook_src"
 NOTEBOOK_DIR = ROOT / "notebooks"          # execution directory: the two data files live here
 DEFAULT_OUT = NOTEBOOK_DIR / "NYC_Housing_Safety.ipynb"
 INLINE = re.compile(r"^# INLINE: (\S+)\s*$")
+INLINE_CONSTANTS = re.compile(r"^# INLINE-CONSTANTS: (\S+)\s*$")
+CONSTANTS_BLOCK = re.compile(r"^# BEGIN SHARED CONSTANTS[^\n]*\n(.*?)^# END SHARED CONSTANTS[^\n]*\n", re.M | re.S)
 MAX_TEXT = 1800                            # characters of text output printed per cell with --show
 
 
@@ -44,11 +48,16 @@ def section_files(prefixes: list[str] | None, src: Path = SRC_DIR) -> list[Path]
 
 def inline_source(source: str) -> str:
     """Replace an `# INLINE: path` cell by the code of that file (its docstring and imports kept)."""
+    constants = INLINE_CONSTANTS.match(source.strip())
+    if constants:
+        block = CONSTANTS_BLOCK.search((ROOT / constants.group(1)).read_text(encoding="utf-8"))
+        return f"# Defined once, in {constants.group(1)}; a value changed here reaches every later section.\n{block.group(1)}"
     match = INLINE.match(source.strip())
     if not match:
         return source
     code = (ROOT / match.group(1)).read_text(encoding="utf-8")
     code = code.replace("from __future__ import annotations\n", "")
+    code = CONSTANTS_BLOCK.sub("", code)   # Section 1 holds them; a second copy would overwrite a changed value
     return f"# The same code as {match.group(1)}, which the website uses.\n{code.strip()}\n"
 
 
