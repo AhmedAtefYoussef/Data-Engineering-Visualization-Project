@@ -1,5 +1,26 @@
 # Number changes
 
+## Reproducible RQ7 reference points (November 2026)
+
+Rebuilding `app/data` from the raw files on another machine moved RQ7 slightly. The cause: many crashes share
+exact coordinates, so a street point often has several nearest crashes, and which one the ball tree returned (and so
+the point's borough and ZIP) depended on library versions. For 18 of the 9,483 street points the tied crashes named
+different boroughs. `reference_street_points` now reduces the crashes to one entry per location, carrying the borough
+and ZIP recorded there most often, so the result is the same on every machine and for any order of the crash rows.
+The street points themselves are unchanged (9,483); only those borough assignments moved.
+
+| Value | Before | After |
+|---|---|---|
+| RQ7 headline (new construction, ranked in the borough) | +19.13 (+9.38 to +22.30) | +19.14 (+9.39 to +22.31) |
+| Both kinds pooled | +14.54 (+4.62 to +19.62) | +14.56 (+4.64 to +19.64) |
+| New construction, ranked in its own ZIP code | +8.72 (+5.62 to +12.29) | +8.68 (+5.61 to +12.29) |
+| One vote per cluster | +10.50 (+7.72 to +13.21) | +10.52 (+7.73 to +13.23) |
+| `sites.parquet` `borough_percentile` | | moved by 0.02 points on average, 0.11 at most |
+
+Every other table and every other result is identical. Two builds from scratch now produce identical tables.
+
+## The statistics correction
+
 Every reader-facing number that moved in the statistics correction, against commit `75c0ffd`. The tables are written by a script that compares `app/data/results.json`, `robustness.parquet`, the other parquet tables and `meta.json` from git with the rebuilt files, not by hand. `built_at`, `build_seconds` and file sizes change on every build and are left out.
 
 ## Headlines

@@ -1,6 +1,6 @@
 {
- "built_at": "2026-10-31 18:53 UTC",
- "build_seconds": 59,
+ "built_at": "2026-11-01 16:29 UTC",
+ "build_seconds": 73,
  "datasets": {
   "housing": {
    "id": "hg8x-zxpr",
@@ -26,16 +26,17 @@
   "housing_hg8x-zxpr.csv": "aa4f3dff65364d2e007453d866731c747a40dc1d2612221bcf7d80598ec4b6fd",
   "crashes_h9gi-nx95.csv.gz": "fd77453582b81726903e64e807a50deaf60ba6aa374d57361b5833feaaf7e80d"
  },
- "source_sha256": "3078c7d6279ac182778944318ec130e3e07c847d7378195a39ce206dfdfd1981",
+ "source_sha256": "122ca2150c2379a4a348301e6a685fc4f9cb94e9d76aa3e43cbe11105983586c",
  "packages": {
-  "numpy": "2.4.4",
+  "numpy": "2.5.4",
   "pandas": "2.3.3",
-  "pyarrow": "23.0.1",
-  "scipy": "1.17.1",
-  "statsmodels": "0.14.6",
-  "matplotlib": "3.10.9",
-  "ipython": "9.17.1",
-  "python": "3.14.3"
+  "pyarrow": "26.0.0",
+  "fastparquet": "2026.9.0",
+  "scipy": "1.18.1",
+  "sklearn": "1.9.1",
+  "matplotlib": "3.11.2",
+  "ipython": "9.18.0",
+  "python": "3.13.18"
  },
  "schema": {
   "crash_cube": {
@@ -345,9 +346,9 @@
   "hour_cube.parquet": 733009,
   "housing_cube.parquet": 18158,
   "map_grid.parquet": 1233457,
-  "results.json": 18312,
+  "results.json": 17817,
   "robustness.parquet": 15611,
-  "sites.parquet": 190782,
+  "sites.parquet": 190862,
   "zip_cube.parquet": 528451,
   "zip_year.parquet": 44437
  }

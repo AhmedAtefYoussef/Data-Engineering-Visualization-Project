@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
 import os
 import platform
@@ -36,7 +37,6 @@ import shutil
 import sys
 import tempfile
 import time
-from importlib import metadata
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -67,7 +67,8 @@ BYTES_PER_MB = 1_000_000
 OUTPUT_TABLES = ["crash_cube", "hour_cube", "zip_cube", "map_grid", "housing_cube", "zip_year", "sites",
                  "event_sites", "city_year", "robustness", "cleaning_log"]
 OUTPUT_FILES = {f"{name}.parquet" for name in OUTPUT_TABLES} | {"results.json", "meta.json"}
-PACKAGES = ["numpy", "pandas", "pyarrow", "scipy", "statsmodels", "matplotlib", "ipython"]
+# Libraries that shape the numbers, by import name: scikit-learn's ball tree finds every distance and neighbour.
+PACKAGES = ["numpy", "pandas", "pyarrow", "fastparquet", "scipy", "sklearn", "statsmodels", "matplotlib", "IPython"]
 REBUILD_COMMAND = "python tools/build_app_data.py"
 
 
@@ -436,12 +437,13 @@ def source_hash(root: Path = ROOT) -> str:
 
 
 def package_versions() -> dict[str, str]:
-    """Versions of the libraries that shape the numbers (only those installed)."""
+    """Versions of the libraries that shape the numbers, read from the modules this process imports (installed
+    package records can disagree with them when two copies are installed)."""
     versions = {}
     for name in PACKAGES:
         try:
-            versions[name] = metadata.version(name)
-        except metadata.PackageNotFoundError:
+            versions[name.lower()] = importlib.import_module(name).__version__
+        except ImportError:
             continue
     versions["python"] = platform.python_version()
     return versions

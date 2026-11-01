@@ -19,6 +19,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import json
+import random
 import re
 from pathlib import Path
 
@@ -337,6 +338,23 @@ FILTER_CASES = {
                                              factors=["Failure to yield or obey"]),
 }
 
+
+
+def _random_filter_cases(count: int = 40, seed: int = 20261101):
+    """Seeded random combinations of every filter the crash path recomputes above (size bands stay out, as there)."""
+    rng = random.Random(seed)
+    for number in range(count):
+        first = rng.randint(filters_module.YEAR_START, filters_module.YEAR_END)
+        case = dict(year_from=first, year_to=rng.randint(first, filters_module.YEAR_END),
+                    harm=rng.choice(list(filters_module.HARM)), scope=rng.choice(list(filters_module.SCOPE)))
+        for key, values in (("boroughs", filters_module.BOROUGHS), ("hours", filters_module.HOUR_BANDS),
+                            ("factors", filters_module.FACTOR_GROUPS), ("construction", filters_module.CONSTRUCTION_TYPES)):
+            if rng.random() < 0.5:
+                case[key] = rng.sample(list(values), rng.randint(1, len(values) - 1))
+        yield f"random_{number:02d}", case
+
+
+FILTER_CASES.update(_random_filter_cases())
 
 @pytest.mark.parametrize("name", list(FILTER_CASES))
 def test_headline_numbers_through_site_filters(raw, store, name):

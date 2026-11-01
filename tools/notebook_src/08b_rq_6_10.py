@@ -214,18 +214,36 @@ RQ7_WITHIN_ZIP = "New construction, ranked in its own ZIP code"
 RQ7_ONE_VOTE = "New construction, ranked in the borough, one vote per cluster"
 
 
-def reference_street_points(crash_frame, tree, tree_rows):
-    """Grid points on the street network, with borough and ZIP of the nearest crash."""
+def most_common_per_place(places, column):
+    """For each (lat, lon), the most frequent value of `column`; equal counts go to the first value in sort order,
+    and a missing value only wins where nothing else is recorded."""
+    counts = places.groupby(["lat", "lon", column], dropna=False, observed=True).size().rename("n").reset_index()
+    counts["missing"] = counts[column].isna()
+    counts = counts.sort_values(["lat", "lon", "missing", "n", column], ascending=[True, True, True, False, True],
+                                kind="stable")
+    return counts.drop_duplicates(["lat", "lon"]).set_index(["lat", "lon"])[column]
+
+
+def reference_street_points(crash_frame, rows):
+    """Grid points on the street network, with borough and ZIP of the nearest crash location.
+
+    Many crashes share exact coordinates, so a grid point often has several nearest crashes. Which of them a tree
+    returns is an implementation detail that changes between library versions, so the crashes are first reduced to
+    one entry per location, carrying the borough and ZIP most often recorded there; the result is then the same on
+    every machine."""
+    located = crash_frame.iloc[rows][["lat", "lon", "borough", "zip"]].astype({"zip": object})
+    place = pd.concat([most_common_per_place(located, "borough"), most_common_per_place(located, "zip")],
+                      axis=1).reset_index()
+    tree = build_haversine_tree(place["lat"].to_numpy(), place["lon"].to_numpy())
     lat_step = REFERENCE_SPACING_M / METRES_PER_DEGREE
     lon_step = lat_step / math.cos(math.radians(MID_LATITUDE_DEG))   # same spacing in metres both ways
     grid_lat, grid_lon = (axis.ravel() for axis in np.meshgrid(np.arange(*NYC_BOUNDS["lat"], lat_step),
                                                                np.arange(*NYC_BOUNDS["lon"], lon_step), indexing="ij"))
     distance, nearest = tree.query(to_radians(grid_lat, grid_lon), k=1)
     on_street = distance[:, 0] * EARTH_RADIUS_M <= STREET_SNAP_M
-    nearest_crash = crash_frame.iloc[tree_rows[nearest[on_street, 0]]]
+    nearest_place = place.iloc[nearest[on_street, 0]]
     points = pd.DataFrame({"lat": grid_lat[on_street], "lon": grid_lon[on_street],
-                           "borough": nearest_crash["borough"].to_numpy(),
-                           "zip": nearest_crash["zip"].astype(object).to_numpy()})
+                           "borough": nearest_place["borough"].to_numpy(), "zip": nearest_place["zip"].to_numpy()})
     return points.dropna(subset=["borough"]).reset_index(drop=True)
 
 
@@ -254,8 +272,7 @@ baseline_tree = build_haversine_tree(crashes["lat"].to_numpy()[in_baseline], cra
 # A street point is one with a crash of any severity in the baseline years: injury crashes alone would
 # select on the outcome, and later years would let crashes after the baseline decide which streets count.
 street_rows = np.flatnonzero((crashes["is_located"] & crashes["year"].between(*BASELINE_YEARS)).to_numpy())
-street_tree = build_haversine_tree(crashes["lat"].to_numpy()[street_rows], crashes["lon"].to_numpy()[street_rows])
-rq7_reference = reference_street_points(crashes, street_tree, street_rows)
+rq7_reference = reference_street_points(crashes, street_rows)
 rq7_sites = sites[sites["start_year"] > BASELINE_YEARS[1]].copy()
 for frame in (rq7_reference, rq7_sites):
     frame["baseline_crashes"] = baseline_tree.query_radius(to_radians(frame["lat"].to_numpy(), frame["lon"].to_numpy()),
