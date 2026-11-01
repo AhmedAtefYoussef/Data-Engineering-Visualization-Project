@@ -87,7 +87,7 @@ If `app/data/` is missing, the page shows a short "not ready" message and the se
 
 ## Deployment
 
-`pyproject.toml` tells Vercel to serve `app.app:server`, the Flask server that Dash creates, on Python 3.12 or newer. `vercel.json` sets `maxDuration` to 60 seconds for `app/app.py`, so a cold start that builds the first report is not cut off. `requirements.txt` lists the five packages the site needs, and `requirements-dev.txt` adds what the notebook, the data build and the tests need. `.vercelignore` keeps `notebooks/`, `tools/`, `tests/` and `docs/` out of the deployment. The site needs no environment variables, disk or database. It is deployed at https://data-engineering-visualization-proj-three.vercel.app/, redeployed on every push to `main`.
+`pyproject.toml` tells Vercel to serve `app.app:server`, the Flask server that Dash creates, on Python 3.12 or newer. `vercel.json` sets `maxDuration` to 60 seconds for `app/app.py`, so a cold start that builds the first report is not cut off. `requirements.txt` lists the five packages the site needs, pinned so their installed size stays under Vercel's 500 MB limit for a Python function (the data is read with fastparquet rather than pyarrow for the same reason), and `requirements-dev.txt` adds what the notebook, the data build and the tests need. `.vercelignore` keeps `notebooks/`, `tools/`, `tests/` and `docs/` out of the deployment. The site needs no environment variables, disk or database. It is deployed at https://data-engineering-visualization-proj-three.vercel.app/, redeployed on every push to `main`.
 
 ## Tests
 

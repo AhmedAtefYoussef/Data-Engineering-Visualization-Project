@@ -116,7 +116,7 @@ python -m pytest -q tests
 
 The site is deployed on Vercel from `main`; every push to `main` redeploys it, and each pull request gets its own preview deployment.
 
-Vercel runs the site as one Python function. `pyproject.toml` names the entry point (`app.app:server`, the Flask server that Dash creates), `vercel.json` gives `app/app.py` a `maxDuration` of 60 seconds, `requirements.txt` lists the five packages the site needs, and `.vercelignore` keeps the notebook, tools, tests and docs out of the deployment.
+Vercel runs the site as one Python function. `pyproject.toml` names the entry point (`app.app:server`, the Flask server that Dash creates), `vercel.json` gives `app/app.py` a `maxDuration` of 60 seconds, `requirements.txt` lists the five packages the site needs, each pinned to an exact version, and `.vercelignore` keeps the notebook, tools, tests and docs out of the deployment.
 
 1. Merge the pull request so that `main` holds the site and `app/data/`.
 2. In the Vercel dashboard choose Add New > Project and import the GitHub repository.
@@ -125,7 +125,7 @@ Vercel runs the site as one Python function. `pyproject.toml` names the entry po
 5. Open the `vercel.app` address in a private window. Check that the page is styled, that Generate report redraws every chart, that a search such as "Brooklyn 2022 new construction" fills the filters, and that the page works at phone width.
 6. Write the address into the submission email.
 
-Two things to know. The function starts on demand, and nothing is precomputed at import, so the first report after a quiet period takes longer than later ones. The installed packages take about 350 MB, under Vercel's 500 MB limit for Python functions; pyarrow is the largest part that could be dropped if that limit ever becomes a problem.
+Two things to know. The function starts on demand, and nothing is precomputed at import, so the first report after a quiet period takes longer than later ones. The installed packages take about 410 MB, under Vercel's 500 MB limit for Python functions. Keep them under it: above the limit Vercel installs the packages on every cold start into a small temporary disk, which fills up, and the page shows "A function needed by this page temporarily failed". That is why the site reads its data with fastparquet (about 17 MB) instead of pyarrow (about 170 MB), and why every version is pinned.
 
 ## Licence and credits
 

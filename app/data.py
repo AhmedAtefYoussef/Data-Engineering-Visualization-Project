@@ -210,7 +210,9 @@ def load(data_dir: Path = DATA_DIR) -> Store:
     recorded = meta.get("schema", {})
 
     def table(name: str) -> pd.DataFrame:
-        frame = pd.read_parquet(data_dir / f"{name}.parquet")
+        # fastparquet, not pyarrow: pyarrow alone is about 170 MB installed and pushed the deployed function past
+        # Vercel's 500 MB limit for Python. Every table reads identically with both (checked column by column).
+        frame = pd.read_parquet(data_dir / f"{name}.parquet", engine="fastparquet")
         check_table(name, frame, window, recorded.get(name))
         return frame
 

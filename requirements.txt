@@ -1,7 +1,11 @@
-# The deployed website (app/). Vercel installs exactly this file.
+# The deployed website (app/). Vercel installs exactly this list (it is repeated in pyproject.toml).
 # For the notebook, the data build and the tests, install requirements-dev.txt as well.
-dash==3.4.0            # pinned: app/assets/site.css styles this version's dropdown markup
-plotly==5.24.1         # pinned: first release with the MapLibre map traces the site uses
-pandas>=2.2,<3
-numpy>=1.26,<3
-pyarrow>=16            # reads app/data/*.parquet
+#
+# Every version is pinned: a Python function on Vercel may hold at most 500 MB of installed packages. Above that,
+# Vercel installs them on each cold start into a small temporary disk, which runs out of space and the page fails
+# ("A function needed by this page temporarily failed"). This list installs to about 410 MB.
+dash==3.4.0            # app/assets/css styles this version's markup
+plotly==5.24.1         # first release with the MapLibre map traces the site uses
+pandas==2.3.3
+numpy==2.5.4
+fastparquet==2026.9.0  # reads app/data/*.parquet; about 17 MB with its helpers, where pyarrow is about 170 MB
