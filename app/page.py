@@ -18,20 +18,10 @@ def _nav_link(target: str, label: str) -> html.A:
     return html.A(label, href=f"#{target}", className="nav-link")
 
 
-def _brand_mark() -> html.Span:
-    """The mark: three gold bars that are buildings and a bar chart at once, standing on a street, and a coral crash
-    point inside the 250 m ring the study draws around every building. On hover the bars are measured again, one
-    after another, and the ring pulses out (assets/css/10-page.css). The favicon draws the same picture."""
-    return html.Span(className="brand-mark", **{"aria-hidden": "true"}, children=[
-        html.I(className="bm-ring"), html.I(className="bm-pulse"), html.I(className="bm-dot"),
-        html.I(className="bm-bar bm-bar-1"), html.I(className="bm-bar bm-bar-2"), html.I(className="bm-bar bm-bar-3"),
-        html.I(className="bm-street"),
-    ])
-
-
 def _masthead() -> html.Header:
     return html.Header(className="masthead", children=[
-        html.A([_brand_mark(), "Housing & Streets, NYC"], href="#top", className="brand"),
+        # The title alone is the way back to the top; the picture lives in the browser tab and the home-screen icon.
+        html.A("Housing & Streets, NYC", href="#top", className="brand", title="Back to the top"),
         html.Nav([_nav_link(*item) for item in NAV], className="nav", **{"aria-label": "Sections"}),
     ])
 

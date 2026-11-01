@@ -1,5 +1,5 @@
-"""The mark beside the title and the browser icon draw the same picture: buildings as bars on a street, and a crash
-point inside its 250 m ring."""
+"""The title stands alone and leads back to the top; the picture is the browser and home-screen icon: buildings inside
+the 250 m ring the study draws around each one, and a crash point on the ring."""
 from __future__ import annotations
 
 import struct
@@ -10,22 +10,14 @@ from app import page
 ASSETS = Path(__file__).resolve().parents[1] / "app" / "assets"
 
 
-def _classes(node):
-    yield from str(getattr(node, "className", "") or "").split()
-    for child in getattr(node, "children", None) or []:
-        if not isinstance(child, str):
-            yield from _classes(child)
-
-
-def test_the_mark_has_three_bars_a_street_and_a_ring():
-    names = list(_classes(page._brand_mark()))
-    assert names.count("bm-bar") == 3
-    assert {"bm-street", "bm-ring", "bm-pulse", "bm-dot"} <= set(names)
+def test_the_title_alone_leads_back_to_the_top():
+    brand = page._masthead().children[0]
+    assert brand.children == "Housing & Streets, NYC" and brand.href == "#top" and brand.className == "brand"
 
 
 def test_the_icons_are_the_new_picture_at_every_size():
     svg = (ASSETS / "favicon.svg").read_text(encoding="utf-8")
-    assert svg.count("<rect") >= 5 and "#ff8f78" in svg and "#D55E00" not in svg
+    assert "<circle" in svg and 'clip-path="url(#inside)"' in svg and svg.count("<rect") >= 4 and "#ff8f78" in svg
     # Read from the file headers, so the test needs no imaging library: an ICO lists its images in 16-byte entries
     # after a 6-byte header; a PNG gives its width and height right after the IHDR tag.
     ico = (ASSETS / "favicon.ico").read_bytes()
