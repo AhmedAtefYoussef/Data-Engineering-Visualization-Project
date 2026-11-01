@@ -37,20 +37,29 @@ def layout(store: Store) -> html.Section:
     lead = (f"Type a ZIP code, a project name or a borough. You see how crash-heavy the streets around one of "
             f"{rows['sites']:,} city-financed buildings already were, and where that falls in its borough.")
     return components.section("block", "Your block", lead, [
-        html.Div(id="bk-root", className="bk-root", **{"data-config": json.dumps(config)}, children=[
-            html.Div(id="bk-search", className="bk-search lift"),
-            html.P([f"{rows['housing_confidential']:,} of the {rows['housing']:,} housing records are confidential. The city "
-                    "withholds where they are, so they cannot be looked up here and are not counted. ", as_of_text(store)],
-                   className="aside bk-asof lift", id="bk-asof"),
-            html.Div(id="bk-record", className="bk-record", **{"aria-live": "polite"}),
-            html.Div(className="bk-rank", children=[
-                html.H3("Sites on the most crash-heavy streets", className="bk-rank-title lift", **{"data-wave": ""}),
-                html.P(f"Injury crashes within {constants['buffer_m']} m, {first} to {last}. This ranks streets and blames no "
-                       f"building: the counts come from {first} to {last}, before any of these sites began construction, so "
-                       "this is not blame on the buildings and says nothing about cause.", className="aside lift bk-rank-note"),
-                html.Div(id="bk-ranked", className="bk-ranked"),
+        # A workbench: the search and the ranked streets on the left, the chosen record on the right. The record
+        # panel stays in view while the list scrolls, so choosing a site never moves the page.
+        html.Div(id="bk-root", className="bk-root bk-workbench", **{"data-config": json.dumps(config)}, children=[
+            html.Div(className="bk-pane bk-pane-list", children=[
+                html.Div(id="bk-search", className="bk-search"),
+                html.Div(className="bk-rank", children=[
+                    html.Div(className="bk-rank-head", children=[
+                        html.H3("Sites on the most crash-heavy streets", className="bk-rank-title"),
+                        html.P(f"Injury crashes within {constants['buffer_m']} m, {first} to {last}. This ranks streets and "
+                               f"blames no building: the counts come from {first} to {last}, before any of these sites "
+                               "began construction, so this is not blame on the buildings and says nothing about cause.",
+                               className="aside bk-rank-note"),
+                    ]),
+                    html.Div(id="bk-ranked", className="bk-ranked"),
+                ]),
+            ]),
+            html.Aside(className="bk-pane bk-pane-record", **{"aria-label": "The chosen site"}, children=[
+                html.Div(id="bk-record", className="bk-record surface spot", **{"aria-live": "polite"}),
             ]),
         ]),
+        html.P([f"{rows['housing_confidential']:,} of the {rows['housing']:,} housing records are confidential. The city "
+                "withholds where they are, so they cannot be looked up here and are not counted. ", as_of_text(store)],
+               className="aside bk-asof", id="bk-asof"),
     ], "harbor", "chapter-block")
 
 

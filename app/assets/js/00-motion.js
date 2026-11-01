@@ -11,10 +11,9 @@
      data-kinetic="words"       words rise out of a mask when the element enters the window
      data-kinetic="lines"       the element lifts in
      data-scrub="words"         words light up with the scroll position
-     data-wave                  a wave runs through the letters on hover
      .button                    a press sends a soft glow from the finger (the hover is pure CSS: 20-components.css)
      .nav                       a lit pill glides under the link that is pointed at, or the section in view
-     .spot                      a soft light follows the pointer
+     .spot                      a soft light trails the pointer and lights the nearest stretch of border
      data-tint on a section     the page's ground drifts to that tint while it is in view */
 (function () {
   "use strict";
@@ -172,31 +171,35 @@
   };
   NYC.onMount("[data-countup]", function (element) { whenSeen(element, function () { NYC.countUp(element); }); });
 
-  /* A wave through the letters. */
-  NYC.onMount("[data-wave]", function (element) {
-    var text = element.textContent;
-    if (element.children.length || !text) { return; }
-    element.setAttribute("aria-label", text);
-    element.textContent = "";
-    Array.prototype.forEach.call(text, function (letter, index) {
-      var span = document.createElement("span");
-      span.className = "wl"; span.textContent = letter;
-      span.style.setProperty("--i", index);
-      span.setAttribute("aria-hidden", "true");
-      element.appendChild(span);
-    });
-  });
+  /* The pointer's light on a .spot area trails the pointer: each frame it covers a fifth of the way that is left,
+     and the loop stops as soon as it has caught up, so a still pointer costs nothing. */
+  var light = { el: null, x: 0, y: 0, tx: 0, ty: 0, raf: 0, fresh: false };
+  function follow() {
+    light.raf = 0;
+    if (!light.el) { return; }
+    light.x += (light.tx - light.x) * 0.2; light.y += (light.ty - light.y) * 0.2;
+    light.el.style.setProperty("--mx", light.x.toFixed(1) + "px");
+    light.el.style.setProperty("--my", light.y.toFixed(1) + "px");
+    if (Math.abs(light.tx - light.x) > 0.5 || Math.abs(light.ty - light.y) > 0.5) { light.raf = window.requestAnimationFrame(follow); }
+  }
 
   /* Hover and press, delegated so Dash re-renders never lose them. */
   document.addEventListener("pointermove", function (event) {
     if (!fine.matches || NYC.reducedMotion() || !event.target.closest) { return; }
     var spot = event.target.closest(".spot");
+    if (spot !== light.el) {
+      if (light.el) { light.el.style.setProperty("--lit", "0"); }
+      light.el = spot;
+      if (spot) { light.fresh = true; spot.style.setProperty("--lit", "1"); }
+    }
     if (spot) {
       var area = spot.getBoundingClientRect();
-      spot.style.setProperty("--mx", (event.clientX - area.left) + "px");
-      spot.style.setProperty("--my", (event.clientY - area.top) + "px");
+      light.tx = event.clientX - area.left; light.ty = event.clientY - area.top;
+      if (light.fresh) { light.x = light.tx; light.y = light.ty; light.fresh = false; }
+      if (!light.raf) { light.raf = window.requestAnimationFrame(follow); }
     }
   }, { passive: true });
+  document.addEventListener("pointerleave", function () { if (light.el) { light.el.style.setProperty("--lit", "0"); light.el = null; } });
   document.addEventListener("pointerdown", function (event) {
     var button = event.target.closest && event.target.closest(".button");
     if (!button || NYC.reducedMotion()) { return; }

@@ -46,32 +46,42 @@ def layout(store: Store) -> html.Section:
             "sites not yet finished. Change who is compared and the answer is recomputed from the records at once. "
             "If a small change makes it jump, it was never solid.")
     options = {key: [value for value, _ in choices] for key, choices in scenarios.options(store).items()}
+    # A workbench: the choices on the left, the live answer on the right. The answer panel stays in view while
+    # the choices change, so every click is seen landing. On a phone a small readout floats at the foot instead.
     return components.section("lab", "Try to break the result", lead, [
-        html.Div(id="sc-root", className="sc-root", **{"data-reference": json.dumps(reference), "data-options": json.dumps(options)}, children=[
-            html.Div(className="sc-readout lift", children=[
-                html.P(id="sc-value", className="sc-value", children=f"{published['estimate']:+.1f}%".replace("-", "−")),
-                html.P(id="sc-range", className="sc-range"),
-                html.P(id="sc-tag", className="sc-tag"),
+        html.Div(id="sc-root", className="sc-root sc-workbench", **{"data-reference": json.dumps(reference), "data-options": json.dumps(options)}, children=[
+            html.Div(className="sc-pane sc-pane-controls", children=[
+                html.P("Change one choice at a time", className="sc-pane-kicker"),
+                html.Div(className="sc-controls", children=[_control(key, label, help_text, store) for key, label, help_text in CONTROLS]),
+                html.Div(className="sc-actions", children=[
+                    _button("sc-back", "Back one step", disabled=True), _button("sc-reset", "Reset", disabled=True),
+                    _button("sc-copy", "Copy link")]),
             ]),
-            html.Div(id="sc-axis", className="sc-axis lift"),
-            html.P(id="sc-sentence", className="sc-sentence lift"),
-            html.Div(id="sc-empty", className="sc-empty", hidden=True),
+            html.Aside(className="sc-pane sc-pane-result", **{"aria-label": "The answer for these choices"}, children=[
+                html.Div(className="sc-panel surface spot", children=[
+                    html.P("This scenario", className="sc-pane-kicker"),
+                    html.Div(className="sc-readout", children=[
+                        html.P(id="sc-value", className="sc-value", children=f"{published['estimate']:+.1f}%".replace("-", "−")),
+                        html.P(id="sc-tag", className="sc-tag"),
+                    ]),
+                    html.P(id="sc-range", className="sc-range"),
+                    html.Div(id="sc-axis", className="sc-axis"),
+                    html.P(id="sc-sentence", className="sc-sentence"),
+                    html.Div(id="sc-empty", className="sc-empty", hidden=True),
+                    html.Div(className="sc-lower", children=[
+                        html.Div(className="sc-tally", children=[
+                            html.P(id="sc-count", className="sc-count"),
+                            html.P(id="sc-count-note", className="sc-count-note"),
+                        ]),
+                        html.Div(className="sc-history-wrap", children=[
+                            html.H3("The last 8 scenarios", className="sc-history-title"),
+                            html.Ol(id="sc-history", className="sc-history"),
+                        ]),
+                    ]),
+                ]),
+            ]),
             html.P(id="sc-status", className="visually-hidden", role="status", **{"aria-live": "polite"}),
-            components.surface([_control(key, label, help_text, store) for key, label, help_text in CONTROLS],
-                               class_name="sc-controls lift"),
-            html.Div(className="sc-actions lift", children=[
-                _button("sc-back", "Back one step", disabled=True), _button("sc-reset", "Reset", disabled=True),
-                _button("sc-copy", "Copy link")]),
-            html.Div(className="sc-lower", children=[
-                html.Div(className="sc-tally lift", children=[
-                    html.P(id="sc-count", className="sc-count"),
-                    html.P(id="sc-count-note", className="sc-count-note"),
-                ]),
-                html.Div(className="sc-history-wrap lift", children=[
-                    html.H3("The last 8 scenarios", className="sc-history-title"),
-                    html.Ol(id="sc-history", className="sc-history"),
-                ]),
-            ]),
+            html.Div(id="sc-float", className="sc-float", **{"aria-hidden": "true"}),
         ]),
     ], "plum", "chapter-lab")
 

@@ -38,7 +38,7 @@ main { display: block; }
 .chapter-lead { max-width: 44rem; margin-top: var(--space-5); color: var(--color-ink); font-size: var(--text-md); line-height: 1.55; }
 
 /* The opening: the stage holds the viewport while the hero and the chapters pass over it. */
-.story-root { position: relative; }
+.story-root { position: relative; overflow: clip; }   /* the sticky stage overhangs by a screen (its negative margin); clip it to the story */
 .stage { position: sticky; top: 0; height: 100vh; height: 100dvh; margin-bottom: -100vh; margin-bottom: -100dvh; overflow: hidden; }
 .stage-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .story-steps { position: relative; z-index: 1; padding-inline: var(--gutter); pointer-events: none; }
@@ -71,9 +71,9 @@ main { display: block; }
 
 /* Chapters: one per screen. The chapter in the middle of the screen is lit, the others wait in shadow. */
 .chapter-step { display: flex; align-items: center; min-height: 100vh; min-height: 100dvh; padding-block: var(--space-8); }
-.step-card { display: grid; gap: var(--space-4); max-width: min(31rem, 42vw); opacity: 0.22; transform: translateY(14px); filter: blur(1.5px);
-  transition: opacity 700ms var(--ease-out), transform 900ms var(--ease-out), filter 700ms var(--ease-out); }
-.chapter-step.is-active .step-card { opacity: 1; transform: none; filter: none; }
+.step-card { display: grid; gap: var(--space-4); max-width: min(31rem, 42vw); opacity: 0.22; transform: translateY(14px);
+  transition: opacity 700ms var(--ease-out), transform 900ms var(--ease-out); }
+.chapter-step.is-active .step-card { opacity: 1; transform: none; }
 .step-title { font-size: clamp(2rem, 1.1rem + 2.3vw, var(--text-2xl)); line-height: 1.06; text-shadow: 0 2px 24px var(--color-page); }
 .step-text { color: var(--color-ink-2); font-size: var(--text-md); line-height: 1.65; text-shadow: 0 1px 16px var(--color-page); }
 .step-text .fig { padding-inline: 0.04em; }
@@ -98,7 +98,7 @@ main { display: block; }
   .stage-canvas { transition: opacity 900ms var(--ease-out); }
   .story-root:has(.hero.is-active) .stage-canvas { opacity: 0.3; }
   .chapter-step { align-items: flex-end; padding-block: 52vh var(--space-6); }
-  .step-card { max-width: none; padding: var(--space-5); background: color-mix(in srgb, var(--color-page) 82%, transparent); border: 1px solid var(--color-line); border-radius: var(--radius); backdrop-filter: blur(14px); }
+  .step-card { max-width: none; padding: var(--space-5); background: rgb(10 13 26 / 0.9); border: 1px solid var(--color-line); border-radius: var(--radius); }
   .hero h1 { text-shadow: 0 2px 24px var(--color-page), 0 0 2px var(--color-page); }
   .masthead { flex-direction: column; align-items: stretch; gap: 0; padding-block: var(--space-2) 0; background: color-mix(in srgb, var(--tint) 86%, transparent); backdrop-filter: blur(14px); }
   .nav { margin-inline: calc(-1 * var(--space-2)); }

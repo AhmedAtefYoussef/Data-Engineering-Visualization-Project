@@ -8,7 +8,8 @@
       watcher notices a changed data-final and plays NYC.countUp again, once the full-screen Generate sequence has
       opened onto the report (or at once when there is none).
    4. The search box types and erases the example queries while it is empty and not focused (never under reduced
-      motion; then the plain placeholder stays).
+      motion; then the plain placeholder stays). Pointing at an example, or focusing it, shows that whole query in
+      the box at once as a preview, fading in; the typing pauses until the pointer leaves.
    5. A link that names filters scrolls to the report once.
 
    1 and 2 are Dash clientside functions (window.dash_clientside.explore), registered in app/callbacks.py. */
@@ -101,7 +102,7 @@
   }
 
   /* ---- the typewriter placeholder ---- */
-  var typing = { on: false, visible: true };
+  var typing = { on: false, visible: true, preview: null };
   function startTypewriter(box) {
     if (typing.on || NYC.reducedMotion()) { return; }
     var input = box.querySelector(".search-input"), ghost = box.querySelector(".search-type");
@@ -124,7 +125,9 @@
 
     function tick() {
       var delay = 60;
-      if (!idle()) {
+      if (typing.preview !== null) {
+        count = 0; erasing = false; delay = 160;
+      } else if (!idle()) {
         hide(); count = 0; erasing = false; delay = 400;
       } else {
         show();
@@ -139,6 +142,32 @@
     return timer;
   }
   NYC.onMount(".search-box", startTypewriter);
+
+  /* ---- the example preview ---- */
+  function preview(button) {
+    var box = document.querySelector(".search-box"), input = box && box.querySelector(".search-input"), ghost = box && box.querySelector(".search-type");
+    if (!ghost || !input || input.value) { return; }
+    typing.preview = button.getAttribute("aria-label") || button.textContent;
+    ghost.textContent = typing.preview;
+    box.classList.add("is-typing", "is-preview");
+    ghost.classList.remove("is-fresh"); void ghost.offsetWidth; ghost.classList.add("is-fresh");
+  }
+  function endPreview() {
+    var box = document.querySelector(".search-box"), ghost = box && box.querySelector(".search-type");
+    typing.preview = null;
+    if (box) { box.classList.remove("is-preview", "is-typing"); }
+    if (ghost) { ghost.textContent = ""; }
+  }
+  document.addEventListener("pointerover", function (event) {
+    var button = event.target.closest && event.target.closest(".examples .example");
+    if (button) { preview(button); }
+  });
+  document.addEventListener("pointerout", function (event) {
+    var button = event.target.closest && event.target.closest(".examples .example");
+    if (button && !button.contains(event.relatedTarget)) { endPreview(); }
+  });
+  document.addEventListener("focusin", function (event) { if (event.target.matches && event.target.matches(".examples .example")) { preview(event.target); } });
+  document.addEventListener("focusout", function (event) { if (event.target.matches && event.target.matches(".examples .example")) { endPreview(); } });
 
   /* ---- a link that names filters opens at the report ---- */
   var linked = /[?&](borough|from|to|type|size|factor|time|who|where)=/.test(window.location.search);

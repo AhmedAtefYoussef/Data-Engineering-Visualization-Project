@@ -84,6 +84,9 @@
   }
   function scrollTo(node) { node.scrollIntoView({ behavior: reduced() ? "auto" : "smooth", block: "start" }); }
   function inView(node) { var box = node.getBoundingClientRect(); return box.top >= 0 && box.top < window.innerHeight * 0.6; }
+  /* Side by side: the tools show their answer in a panel that stays in view, so nothing needs to scroll to it. */
+  var sideBySide = window.matchMedia("(min-width: 1100px)");
+  function wide() { return sideBySide.matches; }
 
   /* ================================================================== YOUR BLOCK */
 
@@ -168,16 +171,32 @@
     function choose(item) {
       closeList();
       if (item.kind === "site") { input.value = item.label; openSite(item.id, true); }
-      else if (item.kind === "zip") { input.value = item.label; openZip(item.id, true); }
+      else if (item.kind === "zip") { input.value = item.label; opened = true; openZip(item.id, true); }
       else { input.value = item.label; ranking.borough = item.id; ranking.offset = 0; syncFilters(); loadRanked(false); setParams({ site: null, zip: null }); clearRecord(); scrollTo(ranked); }
     }
 
     /* ---- the record ---- */
-    function clearRecord() { openSeq++; clear(record); record.classList.remove("is-open"); }
-    function show(node) {
+    function clearRecord() { openSeq++; clear(record); record.classList.remove("is-open"); drawWelcome(); }
+    function drawWelcome() {
+      var box = el("div", "bk-record-inner bk-welcome");
+      box.appendChild(el("p", "bk-welcome-kicker", "The chosen site"));
+      box.appendChild(el("p", "bk-welcome-title", "Pick a site from the list, or search for one"));
+      box.appendChild(el("p", "bk-text", "Its record opens here: where its streets rank in the borough, the crashes around it before it was built, and the sites near it."));
+      clear(record); record.appendChild(box);
+    }
+    var currentSite = null;
+    function markRow() {
+      listEl.querySelectorAll(".bk-row").forEach(function (row) {
+        var mine = currentSite !== null && row.getAttribute("data-site") === String(currentSite);
+        row.classList.toggle("is-selected", mine);
+        if (mine) { row.setAttribute("aria-current", "true"); } else { row.removeAttribute("aria-current"); }
+      });
+    }
+    function show(node, quiet) {
       clear(record); record.appendChild(node); record.classList.add("is-open");
       node.classList.add("bk-enter");
-      if (!inView(record)) { scrollTo(record); }
+      record.scrollTop = 0;
+      if (!quiet && !wide() && !inView(record)) { scrollTo(record); }
       frame(function () { node.classList.add("is-on"); node.querySelectorAll("[data-travel]").forEach(travel); });
     }
     function travel(node) {                                     // a light that runs from the left edge to its place
@@ -217,7 +236,7 @@
     }
     function actions(extraLink) {
       var row = el("div", "bk-actions");
-      var copy = el("button", "button button-secondary magnetic", "Copy link to this view", { type: "button" });
+      var copy = el("button", "button button-secondary", "Copy link to this view", { type: "button" });
       var note = el("span", "visually-hidden", "", { role: "status", "aria-live": "polite" });
       copy.addEventListener("click", function () { copyLink(copy, note); });
       row.appendChild(copy); row.appendChild(note);
@@ -336,7 +355,7 @@
         if (r.nearby_total > r.nearby.length) { nearby.appendChild(el("p", "aside", "and " + num(r.nearby_total - r.nearby.length) + " more nearby.")); }
       } else { nearby.appendChild(el("p", "bk-text", "No other located site is within " + r.buffer_m + " m.")); }
       box.appendChild(nearby);
-      var lab = el("a", "button button-primary magnetic", "Try breaking the result for sites like this", { href: (r.event && r.event.scenario_link) || "#lab" });
+      var lab = el("a", "button button-primary", "Try breaking the result for sites like this", { href: (r.event && r.event.scenario_link) || "#lab" });
       lab.addEventListener("click", function (event) {
         var target = (r.event && r.event.scenario_link) || "#lab";
         if (target.indexOf("?scenario=") === 0) { event.preventDefault(); NYC.setScenario({ sites: "preservation" }); }
@@ -390,7 +409,7 @@
       return box;
     }
 
-    function open(url, render, params, missing) {
+    function open(url, render, params, missing, quiet) {
       var seq = ++openSeq;
       if (openController) { openController.abort(); }
       openController = typeof AbortController === "function" ? new AbortController() : null;
@@ -399,15 +418,16 @@
         if (seq !== openSeq) { return; }
         record.classList.remove("is-loading");
         if (!data) { failure(missing); setParams({ site: null, zip: null }); return; }
-        show(render(data)); setParams(params);
+        currentSite = params.site ? params.site : null; markRow();
+        show(render(data), quiet); if (!quiet) { setParams(params); }
       }).catch(function (error) {
         if (error && error.name === "AbortError") { return; }
         if (seq === openSeq) { record.classList.remove("is-loading"); failure("The record could not be loaded. Try again."); }
       });
     }
-    function openSite(id, fromUser) {
+    function openSite(id, fromUser, quiet) {
       if (fromUser) { setParams({ zip: null }); }
-      return open("/api/block/site?id=" + encodeURIComponent(id), renderSite, { site: String(id), zip: null }, "No located site has that id. Confidential records cannot be looked up.");
+      return open("/api/block/site?id=" + encodeURIComponent(id), renderSite, { site: String(id), zip: null }, "No located site has that id. Confidential records cannot be looked up.", quiet);
     }
     function openZip(code, fromUser) {
       if (fromUser) { setParams({ site: null }); }
@@ -434,8 +454,8 @@
     var listEl = el("ol", "bk-rank-list", null, { "aria-label": "Sites on the most crash-heavy streets" });
     var foot = el("div", "bk-rank-foot");
     var total = el("p", "bk-total", "", { role: "status", "aria-live": "polite" });
-    var more = el("button", "button button-primary magnetic", "Show 25 more", { type: "button" });
-    var csv = el("a", "button button-secondary magnetic", "Download CSV", { href: "/block/ranked.csv", download: "sites_on_crash_heavy_streets.csv" });
+    var more = el("button", "button button-primary", "Show 25 more", { type: "button" });
+    var csv = el("a", "button button-secondary", "Download CSV", { href: "/block/ranked.csv", download: "sites_on_crash_heavy_streets.csv" });
     var buttons = el("div", "bk-rank-buttons"); buttons.appendChild(more); buttons.appendChild(csv);
     foot.appendChild(total); foot.appendChild(buttons);
     ranked.appendChild(controls); ranked.appendChild(listEl); ranked.appendChild(foot);
@@ -452,14 +472,14 @@
       csv.setAttribute("href", "/block/ranked.csv?" + query());
     }
     function rankRow(row, index) {
-      var li = el("li", "bk-row");
+      var li = el("li", "bk-row", null, { "data-site": String(row.site_id) });
       li.style.setProperty("--i", index);
       li.appendChild(el("span", "bk-row-rank", String(row.rank)));
       var main = el("div", "bk-row-main");
       var link = el("a", "bk-row-name", row.project, { href: "?site=" + row.site_id + "#block" });
-      link.addEventListener("click", function (event) { event.preventDefault(); openSite(row.site_id, true); scrollTo(record); });
+      link.addEventListener("click", function (event) { event.preventDefault(); openSite(row.site_id, true); });
       main.appendChild(link);
-      main.appendChild(el("span", "bk-row-meta", row.borough + " " + row.zip + ", " + row.type + ", " + num(row.units) + " units, " + (row.completion_year === null ? "completion not recorded" : "completed " + row.completion_year)));
+      main.appendChild(el("span", "bk-row-meta", row.borough + " " + row.zip + " · " + row.type + " · " + num(row.units) + " units · " + (row.completion_year === null ? "completion not recorded" : "completed " + row.completion_year)));
       li.appendChild(main);
       var figure = el("div", "bk-row-fig");
       figure.appendChild(el("span", "bk-row-num", num(row.baseline_crashes)));
@@ -467,7 +487,7 @@
       li.appendChild(figure);
       return li;
     }
-    var rankSeq = 0;
+    var rankSeq = 0, opened = false;
     function loadRanked(append) {
       var seq = ++rankSeq;
       if (!append) { ranking.offset = 0; }
@@ -478,6 +498,10 @@
         ranked.classList.remove("is-loading");
         if (!append) { clear(listEl); ranking.rows = 0; }
         data.rows.forEach(function (row, index) { listEl.appendChild(rankRow(row, index)); });
+        markRow();
+        // On arrival the record panel shows the top site, so the panel is never empty and the reader sees what a
+        // record holds before choosing. The address is left alone: nothing was chosen yet.
+        if (!append && !opened && data.rows.length) { opened = true; openSite(data.rows[0].site_id, false, true); }
         ranking.rows += data.rows.length; ranking.offset = ranking.rows;
         total.textContent = data.total ? "Showing " + num(ranking.rows) + " of " + num(data.total) + " sites with a crash baseline." : "No site matches these filters.";
         more.hidden = !data.has_more;
@@ -495,8 +519,9 @@
     /* ---- a shared link opens its record ---- */
     var siteParam = getParam("site"), zipParam = getParam("zip");
     var started = null;
-    if (siteParam) { started = openSite(siteParam, false); }
-    else if (zipParam) { started = openZip(zipParam, false); }
+    drawWelcome();
+    if (siteParam) { opened = true; started = openSite(siteParam, false); }
+    else if (zipParam) { opened = true; started = openZip(zipParam, false); }
     if (started && !window.location.hash && !getParam("scenario")) { started.then(function () { scrollTo(root); }); }
   }
 
@@ -539,6 +564,33 @@
     axisEl.setAttribute("role", "img");
     axisEl.appendChild(plot);
     place(barRef, published.low, published.high); dotRef.style.left = pos(published.estimate) + "%";
+
+    /* Every scenario tried leaves a faint mark on the axis, so the reader sees how far the answer has wandered. */
+    var trail = [], TRAIL = 12;
+    function drawTrail(result) {
+      if (result.status !== "ok") { return; }
+      var mark = el("span", "sc-trail" + (result.excludes_zero ? " is-excl" : ""));
+      mark.style.left = pos(result.estimate) + "%";
+      trackNow.insertBefore(mark, trackNow.firstChild);
+      trail.push(mark);
+      while (trail.length > TRAIL) { trail.shift().remove(); }
+      trail.forEach(function (node, k) { node.style.opacity = (0.15 + 0.5 * (k + 1) / trail.length).toFixed(2); });
+    }
+
+    /* On a narrow screen the answer sits above the choices; a small readout floats at the foot while it is out of view. */
+    var floatEl = document.getElementById("sc-float"), panelEl = root.querySelector(".sc-panel"), labInView = false, panelInView = true;
+    function drawFloat(result) {
+      if (!floatEl) { return; }
+      clear(floatEl);
+      floatEl.appendChild(el("span", "sc-float-label", "This scenario"));
+      floatEl.appendChild(el("span", "sc-float-value" + (result.status === "ok" && result.excludes_zero ? " is-excl" : ""), result.status === "ok" ? signed(result.estimate) + "%" : "No estimate"));
+      floatEl.appendChild(el("span", "sc-float-tag", result.status !== "ok" ? "too few sites" : result.excludes_zero ? "excludes zero" : "cannot be told from zero"));
+    }
+    function placeFloat() { if (floatEl) { floatEl.classList.toggle("is-on", !wide() && labInView && !panelInView); } }
+    if ("IntersectionObserver" in window && floatEl && panelEl) {
+      new IntersectionObserver(function (entries) { labInView = entries[0].isIntersecting; placeFloat(); }).observe(root);
+      new IntersectionObserver(function (entries) { panelInView = entries[0].isIntersecting; placeFloat(); }, { threshold: 0.35 }).observe(panelEl);
+    }
 
     var level = reference.level_text || "95%";
     var state = { spec: Object.assign({}, defaults), past: [], history: [], tried: {}, tries: 0, excluding: 0, shown: published.estimate, last: null, seq: 0, controller: null, cancel: null, drawn: null };
@@ -635,7 +687,8 @@
         });
         emptyEl.appendChild(row);
       }
-      moveBar(result); describeAxis(result);
+      moveBar(result); describeAxis(result); drawTrail(result); drawFloat(result);
+      if (panelEl && !reduced()) { panelEl.classList.remove("is-fresh"); void panelEl.offsetWidth; panelEl.classList.add("is-fresh"); }
       statusEl.textContent = ok ? "Estimate " + signed(result.estimate) + " percent. " + (result.excludes_zero ? "Excludes zero." : "Cannot be told from no change.") : "No estimate for this choice.";
       state.last = result;
     }

@@ -17,6 +17,9 @@
   var NYC = window.NYC;
   var TONES = [[95, 212, 196], [232, 192, 116], [255, 143, 120], [255, 240, 205]];
   var FADE_MS = 260, MOVE_MS = 1250, SPREAD_MS = 520, SPARK_PX = 14, INTRO_MS = 2200, ARC_PX = 70;
+  // Cost: the canvas is held to 1.5 device pixels, and at rest (nothing travelling, pointer still) the twinkle is
+  // drawn at about 30 frames a second instead of every frame. Chart labels are drawn once into their own canvas.
+  var MAX_SCALE = 1.5, REST_FRAME_MS = 33;
   var FONT_SANS = "\"Hanken Grotesk\", system-ui, sans-serif", FONT_DISPLAY = "\"Bodoni Moda\", Georgia, serif";
 
   function sprite(rgb) {
@@ -67,15 +70,17 @@
     var sprites = TONES.map(sprite);
     var scale = 1, current = null, from = null, to = null, startedAt = 0, seeds = null, visible = true;
     var pointerX = 0, pointerY = 0, driftX = 0, driftY = 0;
-    var intro = true, running = false, marks = [], oldMarks = [], marksIn = 1;
+    var intro = true, running = false, marks = [], oldMarks = [], marksIn = 1, lastDrawn = 0;
+    var markLayer = document.createElement("canvas"), oldLayer = document.createElement("canvas");
 
     function resize() {
-      scale = Math.min(window.devicePixelRatio || 1, 2);
+      scale = Math.min(window.devicePixelRatio || 1, MAX_SCALE);
       Stage.width = host.clientWidth; Stage.height = host.clientHeight;
       canvas.width = Math.round(Stage.width * scale); canvas.height = Math.round(Stage.height * scale);
       if (!Stage.data) { return; }
       var layout = Stage.layouts[Stage.layoutName](Stage);
       current = copy(layout); from = to = null; marks = layout.marks || []; oldMarks = []; marksIn = 1;
+      paintMarks(markLayer, marks);
       kick();
     }
     function copy(layout) {
@@ -83,35 +88,53 @@
                size: layout.size ? layout.size.slice() : null, tone: layout.tone ? layout.tone.slice() : null };
     }
 
-    function drawMarks(list, opacity) {
-      if (opacity <= 0.01) { return; }
-      context.globalCompositeOperation = "source-over";
+    /* The chart's words and rules, painted once per arrangement into a canvas of their own; each frame only
+       stamps that canvas with the right opacity. */
+    function paintMarks(layer, list) {
+      layer.width = canvas.width; layer.height = canvas.height;
+      var g = layer.getContext("2d");
+      g.setTransform(scale, 0, 0, scale, 0, 0);
+      g.clearRect(0, 0, Stage.width, Stage.height);
       list.forEach(function (mark) {
-        context.globalAlpha = opacity * (mark.opacity == null ? 1 : mark.opacity);
+        g.globalAlpha = mark.opacity == null ? 1 : mark.opacity;
         if (mark.t === "line") {
-          context.strokeStyle = mark.color || "rgba(201,202,214,0.5)";
-          context.lineWidth = mark.width || 1;
-          context.setLineDash(mark.dash || []);
-          context.beginPath(); context.moveTo(mark.x1, mark.y1); context.lineTo(mark.x2, mark.y2); context.stroke();
-          context.setLineDash([]);
+          g.strokeStyle = mark.color || "rgba(201,202,214,0.5)";
+          g.lineWidth = mark.width || 1;
+          g.setLineDash(mark.dash || []);
+          g.beginPath(); g.moveTo(mark.x1, mark.y1); g.lineTo(mark.x2, mark.y2); g.stroke();
+          g.setLineDash([]);
         } else {
           var display = mark.font === "display";
-          context.font = (mark.weight || (display ? 600 : 500)) + " " + (mark.size || 13) + "px " + (display ? FONT_DISPLAY : FONT_SANS);
-          context.fillStyle = mark.color || "#c9cad6";
-          context.textAlign = mark.align || "left";
-          context.textBaseline = mark.baseline || "alphabetic";
-          context.shadowColor = "rgba(10,13,26,0.9)"; context.shadowBlur = 10;
-          context.fillText(mark.text, mark.x, mark.y);
-          context.shadowBlur = 0;
+          g.font = (mark.weight || (display ? 600 : 500)) + " " + (mark.size || 13) + "px " + (display ? FONT_DISPLAY : FONT_SANS);
+          g.fillStyle = mark.color || "#c9cad6";
+          g.textAlign = mark.align || "left";
+          g.textBaseline = mark.baseline || "alphabetic";
+          g.shadowColor = "rgba(10,13,26,0.9)"; g.shadowBlur = 10;
+          g.fillText(mark.text, mark.x, mark.y);
+          g.shadowBlur = 0;
         }
       });
+      layer.empty = !list.length;
+    }
+    function stamp(layer, opacity) {
+      if (opacity <= 0.01 || layer.empty) { return; }
+      context.globalCompositeOperation = "source-over";
+      context.globalAlpha = opacity;
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.drawImage(layer, 0, 0);
+      context.setTransform(scale, 0, 0, scale, 0, 0);
       context.globalAlpha = 1;
     }
+    // Fonts arrive after the first paint: repaint the labels once they are ready.
+    if (document.fonts && document.fonts.ready) { document.fonts.ready.then(function () { paintMarks(markLayer, marks); kick(); }); }
 
     function draw(now) {
       running = false;
       if (!Stage.data || !current) { return; }
       var n = Stage.data.n, i, more = false, reduced = NYC.reducedMotion(), settled = !to;
+      var resting = settled && !intro && Math.abs(pointerX - driftX) < 0.2 && Math.abs(pointerY - driftY) < 0.2;
+      if (resting && now - lastDrawn < REST_FRAME_MS) { if (visible && !reduced) { kick(); } return; }
+      lastDrawn = now;
       if (to) {
         var elapsed = now - startedAt, fade = Math.min(1, elapsed / FADE_MS), finished = true;
         for (i = 0; i < n; i++) {
@@ -152,8 +175,8 @@
         context.drawImage(sprites[tones[i]], current.x[i] + driftX - size / 2, current.y[i] + driftY + float - size / 2, size, size);
       }
       context.globalAlpha = 1;
-      if (oldMarks.length) { drawMarks(oldMarks, 1 - Math.min(1, (now - startedAt) / FADE_MS)); }
-      drawMarks(marks, marksIn);
+      if (oldMarks.length) { stamp(oldLayer, 1 - Math.min(1, (now - startedAt) / FADE_MS)); }
+      stamp(markLayer, marksIn);
       if (introT >= 1) { intro = false; }
       if (more || intro || (visible && !reduced)) { kick(); }
     }
@@ -164,9 +187,11 @@
       Stage.layoutName = name;
       var layout = Stage.layouts[name](Stage), target = copy(layout);
       oldMarks = marks; marks = layout.marks || []; marksIn = 0;
+      var spare = oldLayer; oldLayer = markLayer; markLayer = spare; paintMarks(markLayer, marks);
       if (!target.size) { target.size = seeds.size.slice(); }
       if (!current.size) { current.size = seeds.size.slice(); }
       if (NYC.reducedMotion()) { current = target; from = to = null; oldMarks = []; marksIn = 1; kick(); return; }
+      lastDrawn = 0;
       // The new colour shows from the start of the journey, so a point is already what it will mean when it lands.
       current.tone = target.tone || null; current.toneNext = current.tone;
       from = copy(current); to = target; startedAt = performance.now();

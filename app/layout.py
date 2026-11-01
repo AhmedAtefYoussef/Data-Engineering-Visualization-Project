@@ -108,7 +108,7 @@ def search_box() -> html.Div:
             ]),
         ]),
         html.P(["Try ", *[html.Button(text, id={"type": "example", "index": position}, className="example",
-                                      n_clicks=0, type="button", style={"--i": position}, **{"data-wave": ""})
+                                      n_clicks=0, type="button", style={"--i": position})
                           for position, text in enumerate(EXAMPLE_QUERIES)]], className="examples"),
         html.Div(search_hint(), id="search-feedback", className="search-feedback", role="status",
                  **{"aria-live": "polite"}),

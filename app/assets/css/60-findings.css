@@ -19,10 +19,8 @@
 .fd-filters .field-label { color: var(--color-ink-3); font-weight: 500; }
 .fd-chip {
   min-height: 2.5rem; padding: 0 var(--space-4); font: inherit; font-size: var(--text-sm); color: var(--color-ink-2); cursor: pointer;
-  background: rgb(255 255 255 / 0.04); border: 1px solid var(--color-line-strong); border-radius: 999px;
-  transition: background-color var(--duration-base) var(--ease-out), color var(--duration-fast) ease-out, border-color var(--duration-fast) ease-out, scale var(--duration-fast) ease-out;
+  background-color: rgb(255 255 255 / 0.04); border: 1px solid var(--color-line-strong); border-radius: 999px;
 }
-.fd-chip:hover { color: var(--color-ink); border-color: var(--color-ink-3); }
 .fd-chip:active { scale: 0.96; }
 .fd-chip[aria-pressed="true"] { background: var(--color-primary); border-color: transparent; color: var(--color-on-primary); font-weight: 600; }
 @media (pointer: coarse) { .fd-chip { min-height: 2.75rem; } }
