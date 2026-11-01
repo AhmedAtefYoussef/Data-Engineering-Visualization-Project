@@ -219,15 +219,17 @@ def register(app: Dash, store: Store) -> None:
         output={"header": Output("report-header", "children"), "tiles": Output("report-tiles", "children"),
                 **figure_outputs(report.CHART_KEYS), "filters": Output("report-filters", "data"),
                 "share": Output("share-url", "data")},
-        inputs=[Input("generate", "n_clicks"), Input("search", "n_submit"), Input("reset", "n_clicks")],
+        inputs=[Input("generate", "n_clicks"), Input("search", "n_submit"), Input("reset", "n_clicks"),
+                Input("lazy-report-ready", "data")],
         state=[State(control_id, "value") for control_id in CONTROL_IDS] + [State("search", "value"),
                                                                            State("url", "search")],
         running=[(Output("generate", "disabled"), True, False),
                  (Output("generate", "children"), GENERATING_LABEL, GENERATE_LABEL),
-                 (Output("report", "className"), "report is-loading", "report")])
-    def generate(_clicks, _submits, _reset, *state):
-        """Redraw the figures and every chart but the last. Runs once on page load (from the address if it names
-        filters), and on Reset."""
+                 (Output("report", "className"), "report is-loading", "report")],
+        prevent_initial_call=True)
+    def generate(_clicks, _submits, _reset, _ready, *state):
+        """Redraw the figures and every chart but the last. Runs once its charts are on the page (app/lazy.py: the
+        reader came near; from the address if it names filters), and on Generate, Enter and Reset."""
         *values, text, search = state
         filters, query, notes = request_filters(ctx.triggered_id, values, text if isinstance(text, str) else "", search)
         return report_outputs(store, filters, query, notes)

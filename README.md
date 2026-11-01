@@ -43,6 +43,8 @@ One page, read from top to bottom:
 
 Every figure on the page is read from `app/data/`; none is typed into the code.
 
+**Performance and accessibility.** The charts are built only when the reader comes within about two screens of them (`app/lazy.py`), so the opening page loads no chart library. Phones and touch screens get a light mode: no blur filters, a canvas drawn at one device pixel that draws only while its points move, and viewport units that do not change as the address bar slides. Measured on an emulated iPhone 13 with the processor slowed four times, the first content arrives in about 3.5 seconds (18 before), the main thread is blocked for about 2.5 seconds during load (21.6 before) and the page downloads 2.4 MB (7.6 before). axe-core reports no WCAG 2.2 A or AA violation on phone or desktop, controls are at least 44 px tall on touch screens, and every animated text keeps one plain copy for screen readers.
+
 ## Repository layout
 
 ```

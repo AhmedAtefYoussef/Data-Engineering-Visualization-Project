@@ -21,7 +21,7 @@
 
   var NYC = window.NYC;
   var RELEASE_MS = 1750, passing = false;
-  var MIN_MS = 3200, STEP_MS = 720, MAX_WAIT_MS = 15000, OUT_MS = 950, POLL_MS = 80, SPARK = 12, RINGS = 7, MAX_POINTS = 5200, MAX_SCALE = 1.5;
+  var MIN_MS = 3200, STEP_MS = 720, MAX_WAIT_MS = 15000, OUT_MS = 950, POLL_MS = 80, SPARK = 12, RINGS = 7, MAX_POINTS = 5200, LITE_POINTS = 2200, MAX_SCALE = 1.5;
   var TONES = [[95, 212, 196], [232, 192, 116], [255, 143, 120], [255, 240, 205]];
   var armed = false, overlay = null, raf = 0, startedAt = 0, finishing = false, done = false, fallback = 0, poll = 0, leftAt = 0, opening = 0;
 
@@ -47,7 +47,8 @@
   /* One record per building: where it starts, where it lands in the city, and its own timing. */
   function cloud(width, height) {
     var data = NYC.Stage && NYC.Stage.data, out = [], i;
-    var n = data ? data.n : 2400, lonMax = 1, latMax = 1, aspect = 0.82, stride = Math.max(1, n / MAX_POINTS);
+    var n = data ? data.n : 2400, lonMax = 1, latMax = 1, aspect = 0.82;
+    var stride = Math.max(1, n / (NYC.lite && NYC.lite() ? LITE_POINTS : MAX_POINTS));   // fewer points on a phone
     if (data) {
       for (i = 0; i < n; i++) { lonMax = Math.max(lonMax, data.lon[i]); latMax = Math.max(latMax, data.lat[i]); }
       var midLat = (data.origin[1] + latMax / 2) / data.scale;
@@ -94,7 +95,7 @@
     document.documentElement.style.overflow = "hidden";
 
     var reduced = NYC.reducedMotion(), texts = steps(), stepShown = 0;
-    var context = canvas.getContext("2d"), width = window.innerWidth, height = window.innerHeight, scale = Math.min(window.devicePixelRatio || 1, MAX_SCALE);
+    var context = canvas.getContext("2d"), width = window.innerWidth, height = window.innerHeight, scale = NYC.lite && NYC.lite() ? 1 : Math.min(window.devicePixelRatio || 1, MAX_SCALE);
     canvas.width = width * scale; canvas.height = height * scale;
     context.scale(scale, scale);
     var sprites = TONES.map(sprite), city = reduced ? null : cloud(width, height), rings = [];

@@ -201,7 +201,9 @@ def explorer() -> html.Section:
                 html.H3("Report", className="visually-hidden"),
                 html.Div(id="report-header", className="report-header", role="status", **{"aria-live": "polite"}),
                 html.Div(id="report-tiles", className="figures"),
-                *[_group(slug, title, keys) for slug, title, keys in GROUPS],
+                # The charts load Plotly; they are built when the reader comes near (app/lazy.py).
+                html.Div(className="report-groups", **{"data-lazy": "lazy-report"},
+                         children=[_group(slug, title, keys) for slug, title, keys in GROUPS]),
             ]),
             html.P(["Injury crashes are the default outcome. A crash counts when at least one person was injured or "
                     "killed. Total crash reports cannot be compared across 2020, as ",

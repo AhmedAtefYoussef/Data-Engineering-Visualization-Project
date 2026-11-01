@@ -47,7 +47,7 @@ main { display: block; }
 
 /* The opening: the stage holds the viewport while the hero and the chapters pass over it. */
 .story-root { position: relative; overflow: clip; }   /* the sticky stage overhangs by a screen (its negative margin); clip it to the story */
-.stage { position: sticky; top: 0; height: 100vh; height: 100dvh; margin-bottom: -100vh; margin-bottom: -100dvh; overflow: hidden; }
+.stage { position: sticky; top: 0; height: 100vh; height: 100lvh; margin-bottom: -100vh; margin-bottom: -100lvh; overflow: hidden; }
 .stage-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .story-steps { position: relative; z-index: 1; padding-inline: var(--gutter); pointer-events: none; }
 .story-steps a, .story-steps button, .story-steps input, .story-steps label { pointer-events: auto; }
@@ -58,7 +58,7 @@ main { display: block; }
 .step-name { display: inline-flex; align-items: center; gap: var(--space-2); margin-left: var(--space-2); color: var(--color-ink-2); }
 .step-name::before { content: ""; width: 1.75rem; height: 1px; background: rgb(var(--gold-rgb) / 0.6); }
 
-.hero { position: relative; display: flex; flex-direction: column; justify-content: center; gap: clamp(0.85rem, 2.2vh, var(--space-5)); min-height: 100vh; min-height: 100dvh; max-width: min(50rem, 52vw); padding-block: 5.25rem 4.5rem; }
+.hero { position: relative; display: flex; flex-direction: column; justify-content: center; gap: clamp(0.85rem, 2.2vh, var(--space-5)); min-height: 100vh; min-height: 100svh; max-width: min(50rem, 52vw); padding-block: 5.25rem 4.5rem; }
 .hero-kicker { color: var(--color-accent); }
 .hero h1 { text-shadow: 0 2px 30px var(--color-page); }
 .hero-lead { max-width: 37rem; color: var(--color-ink-2); font-size: var(--text-md); line-height: 1.5; }
@@ -78,8 +78,8 @@ main { display: block; }
 @keyframes cue { 60%, 100% { transform: translateX(100%); } }
 
 /* Chapters: one per screen. The chapter in the middle of the screen is lit, the others wait in shadow. */
-.chapter-step { display: flex; align-items: center; min-height: 100vh; min-height: 100dvh; padding-block: var(--space-8); }
-.step-card { display: grid; gap: var(--space-4); max-width: min(31rem, 42vw); opacity: 0.22; transform: translateY(14px);
+.chapter-step { display: flex; align-items: center; min-height: 100vh; min-height: 100svh; padding-block: var(--space-8); }
+.step-card { display: grid; gap: var(--space-4); max-width: min(31rem, 42vw); opacity: 0.75; transform: translateY(14px);
   transition: opacity 700ms var(--ease-out), transform 900ms var(--ease-out); }
 .chapter-step.is-active .step-card { opacity: 1; transform: none; }
 .step-title { font-size: clamp(2rem, 1.1rem + 2.3vw, var(--text-2xl)); line-height: 1.06; text-shadow: 0 2px 24px var(--color-page); }

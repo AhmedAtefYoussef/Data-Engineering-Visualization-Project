@@ -26,6 +26,11 @@
   var TINTS = { midnight: "#0a0d1a", harbor: "#081521", plum: "#0d0f22", ember: "#0e1220" };
 
   NYC.reducedMotion = function () { return motion.matches; };
+  /* Phones, touch screens and small processors get the light version: the same states, no blur filters, no
+     scroll-lit words and a canvas that only draws while it moves. */
+  var lite = window.matchMedia("(max-width: 760px), (pointer: coarse)").matches || (navigator.hardwareConcurrency || 8) <= 4;
+  NYC.lite = function () { return lite; };
+  if (lite) { document.documentElement.classList.add("is-lite"); }
   NYC.easeOut = function (t) { return 1 - Math.pow(1 - t, 4); };
   NYC.easeInOut = function (t) { return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2; };
 
@@ -67,9 +72,11 @@
   function splitWords(element, wrap) {
     var text = element.textContent;
     if (!text.trim() || element.children.length) { return null; }
-    element.setAttribute("aria-label", text);
-    if (!element.getAttribute("role") && element.tagName === "P") { element.setAttribute("role", "paragraph"); }
     element.textContent = "";
+    // Screen readers read this one copy of the sentence; the animated words below are hidden from them.
+    var spoken = document.createElement("span");
+    spoken.className = "visually-hidden"; spoken.textContent = text;
+    element.appendChild(spoken);
     var words = [];
     text.trim().split(/\s+/).forEach(function (word, index, all) {
       var node = wrap(word, index);
@@ -104,7 +111,7 @@
   /* Words that light up as the paragraph moves through the window. */
   var scrubbing = [];
   NYC.onMount("[data-scrub='words']", function (element) {
-    if (NYC.reducedMotion()) { return; }
+    if (NYC.reducedMotion() || lite) { return; }
     var words = splitWords(element, function (word) {
       var span = document.createElement("span");
       span.className = "sw"; span.textContent = word;
@@ -157,15 +164,15 @@
       }
       holder.appendChild(cell);
     });
-    element.setAttribute("aria-label", final);
+    var spoken = document.createElement("span");
+    spoken.className = "visually-hidden"; spoken.textContent = final;
     element.classList.add("is-rolling");
-    element.replaceChildren(holder);
+    element.replaceChildren(spoken, holder);
     void holder.offsetWidth;
     element.classList.add("is-rolled");
     window.setTimeout(function () {
       element.replaceChildren.apply(element, original);
       element.classList.remove("is-rolling", "is-rolled");
-      element.removeAttribute("aria-label");
       element.__rolling = false;
     }, ROLL_MS + digits * ROLL_STAGGER_MS + 120);
   };
@@ -233,14 +240,14 @@
   });
 
   /* Reading position, section in view, ground tint. */
-  var ticking = false, sections = [], links = [];
+  var ticking = false, sections = [], links = [], shownTint = null;
   function update() {
     ticking = false;
     var doc = document.documentElement, height = window.innerHeight, top = window.scrollY;
     var page = document.querySelector(".page");
     if (page) { if (top > 40) { page.setAttribute("data-scrolled", ""); } else { page.removeAttribute("data-scrolled"); } }
     var thread = document.getElementById("thread");
-    if (thread) { thread.style.setProperty("--read", Math.min(1, top / Math.max(1, doc.scrollHeight - height)).toFixed(4)); }
+    if (thread && thread.offsetParent !== null) { thread.style.setProperty("--read", Math.min(1, top / Math.max(1, doc.scrollHeight - height)).toFixed(4)); }
     updateScrub(height);
     var current = null;
     sections.forEach(function (section) {
@@ -249,7 +256,8 @@
     });
     if (current) {
       var tint = TINTS[current.getAttribute("data-tint")] || TINTS.midnight;
-      document.documentElement.style.setProperty("--tint", tint);
+      // Only when it changes: setting it restyles the whole document, which on every scroll frame cost a phone dearly.
+      if (tint !== shownTint) { shownTint = tint; document.documentElement.style.setProperty("--tint", tint); }
       var changed = false;
       links.forEach(function (link) {
         var mine = link.getAttribute("href") === "#" + current.id;

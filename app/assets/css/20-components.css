@@ -198,3 +198,12 @@ summary::before { content: ""; width: 0.45em; height: 0.45em; flex: none; border
 details[open] > summary::before { transform: translateY(-30%) rotate(45deg); }
 details[open] > .table-wrap { animation: arrive var(--duration-base) var(--ease-out); }
 @media (max-width: 640px) { .picker-trigger { padding-inline: var(--space-3); gap: var(--space-2); } }
+
+/* A part built when the reader comes near (app/lazy.py): an empty frame of about the height it will have, so the
+   page does not jump when it arrives, with a slow shimmer while it is on its way. */
+.lazy-frame { height: var(--lazy-h, 20rem); border-radius: var(--radius); background: linear-gradient(90deg, rgb(255 255 255 / 0.015) 25%, rgb(255 255 255 / 0.04) 50%, rgb(255 255 255 / 0.015) 75%) 0 0 / 200% 100%; animation: shimmer 2.4s linear infinite; }
+#lazy-report { --lazy-h: 5670px; }
+#lazy-robustness { --lazy-h: 896px; }
+#lazy-reporting { --lazy-h: 320px; }
+@media (max-width: 1099px) { #lazy-report { --lazy-h: 7530px; } }
+@media (max-width: 640px) { #lazy-report { --lazy-h: 8880px; } }
