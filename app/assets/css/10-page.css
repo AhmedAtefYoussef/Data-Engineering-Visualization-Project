@@ -7,9 +7,35 @@
 .page[data-scrolled] .masthead { background: color-mix(in srgb, var(--tint) 86%, transparent); backdrop-filter: blur(14px); }
 .brand { display: inline-flex; align-items: center; gap: var(--space-3); color: var(--color-ink); font-family: var(--font-display); font-size: var(--text-md); font-weight: 600; text-decoration: none; white-space: nowrap; }
 .brand:hover { color: var(--color-ink); }
-.brand-mark { position: relative; flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 1.5px solid var(--color-primary); transition: transform var(--duration-slow) var(--ease-out); }
-.brand-mark::after { content: ""; position: absolute; inset: 0; margin: auto; width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--color-primary); }
-.brand:hover .brand-mark { transform: scale(1.18); }
+/* The mark (app/page.py): buildings as bars on a street, a crash point inside its 250 m ring. The bars grow in once
+   when the page opens; on hover they are measured again in turn while the ring pulses out. */
+.brand-mark {
+  position: relative; flex: none; width: 2rem; height: 2rem; overflow: hidden; border-radius: 9px;
+  background: radial-gradient(120% 120% at 80% 10%, rgb(var(--gold-rgb) / 0.16), transparent 60%), linear-gradient(180deg, #161c31, #0d1222);
+  border: 1px solid rgb(var(--gold-rgb) / 0.4); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 4px 14px -6px rgb(var(--gold-rgb) / 0.45);
+  transition: border-color var(--duration-base) ease-out, box-shadow var(--duration-slow) var(--ease-out);
+}
+.brand-mark i { position: absolute; display: block; }
+.bm-street { left: 14%; right: 14%; bottom: 20%; height: 1px; background: rgb(var(--gold-rgb) / 0.55); }
+.bm-bar { bottom: 20%; width: 15%; border-radius: 1.5px 1.5px 0 0; background: var(--gold-gradient); transform-origin: bottom; animation: bm-grow 900ms var(--ease-out) backwards; }
+.bm-bar-1 { left: 20%; height: 30%; animation-delay: 300ms; }
+.bm-bar-2 { left: 42.5%; height: 46%; animation-delay: 380ms; }
+.bm-bar-3 { left: 65%; height: 36%; animation-delay: 460ms; }
+.bm-dot { right: 25%; top: 25%; width: 4px; height: 4px; margin: -2px -2px 0 0; border-radius: 50%; background: var(--color-crash); box-shadow: 0 0 6px 1px rgb(var(--crash-rgb) / 0.7); }
+.bm-ring, .bm-pulse { right: 25%; top: 25%; width: 10px; height: 10px; margin: -5px -5px 0 0; border-radius: 50%; border: 1px solid rgb(var(--crash-rgb) / 0.55); }
+.bm-pulse { opacity: 0; }
+@keyframes bm-grow { from { transform: scaleY(0); } }
+.brand:hover .brand-mark, .brand:focus-visible .brand-mark { border-color: rgb(var(--gold-rgb) / 0.75); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), 0 6px 22px -6px rgb(var(--gold-rgb) / 0.7); }
+/* The grow-in stays first in the list, so it never replays when the pointer leaves; only the measuring is added. */
+.brand:hover .bm-bar, .brand:focus-visible .bm-bar { animation: bm-grow 900ms var(--ease-out) backwards, bm-measure 1100ms var(--spring) both; }
+.brand:hover .bm-bar-1, .brand:focus-visible .bm-bar-1 { animation-delay: 300ms, 0ms; }
+.brand:hover .bm-bar-2, .brand:focus-visible .bm-bar-2 { animation-delay: 380ms, 110ms; }
+.brand:hover .bm-bar-3, .brand:focus-visible .bm-bar-3 { animation-delay: 460ms, 220ms; }
+@keyframes bm-measure { 0% { transform: scaleY(1); } 30% { transform: scaleY(0.2); } 70% { transform: scaleY(1.35); } 100% { transform: scaleY(1); } }
+.brand:hover .bm-pulse, .brand:focus-visible .bm-pulse { animation: bm-pulse 1400ms var(--ease-out) 150ms infinite; }
+@keyframes bm-pulse { from { opacity: 0.9; transform: scale(0.6); } to { opacity: 0; transform: scale(2.6); } }
+.brand:hover .bm-dot, .brand:focus-visible .bm-dot { animation: bm-blink 1400ms ease-in-out 150ms infinite; }
+@keyframes bm-blink { 50% { box-shadow: 0 0 10px 3px rgb(var(--crash-rgb) / 0.9); } }
 /* The navigation: a lit pill of glass glides beneath the link pointed at, and rests under the section in view
    (placed by 00-motion.js). The links themselves never move. */
 .nav { position: relative; display: flex; gap: 2px; padding: 4px; overflow-x: auto; scrollbar-width: none; border-radius: 999px; background: rgb(255 255 255 / 0.025); border: 1px solid rgb(255 255 255 / 0.05); }
