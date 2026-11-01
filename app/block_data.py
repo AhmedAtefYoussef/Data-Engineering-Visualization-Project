@@ -165,8 +165,8 @@ def _event(store: Store, lookup: SimpleNamespace, site) -> dict | None:
     cohorts = [int(year) for year in table["cohort"]]
     return {"role": role, "cohorts": cohorts, "cohort": cohorts[0], "before": before, "after": after,
             "years": [{"year": year, "count": counts[year]} for year in sorted(counts)],
-            "scenario_link": "/scenarios" if site.construction_type != "Preservation" or role == "comparison"
-            else "/scenarios?sites=preservation"}
+            "scenario_link": "#lab" if site.construction_type != "Preservation" or role == "comparison"
+            else "?scenario=sites:preservation#lab"}
 
 
 def site_record(store: Store, site_id) -> dict | None:

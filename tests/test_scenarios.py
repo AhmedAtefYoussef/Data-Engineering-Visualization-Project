@@ -184,3 +184,8 @@ def test_the_page_names_each_control_and_never_shows_a_generate_button(store):
     for key in scenarios.DEFAULT_SPEC:
         assert f"sc-{key}" in rendered
     assert "Generate" not in rendered and "sc-back" in rendered and "sc-reset" in rendered
+
+
+def test_a_scenario_url_spec_round_trips_through_the_route(client):
+    got = client.get("/api/scenario?sites=preservation&borough=Queens").get_json()
+    assert got["spec"]["sites"] == "preservation" and got["spec"]["borough"] == "Queens"

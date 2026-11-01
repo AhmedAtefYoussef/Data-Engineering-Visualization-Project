@@ -250,9 +250,9 @@ def test_the_search_route_survives_hostile_queries(client, query):
 def test_the_page_has_the_ranked_list_and_states_what_cannot_be_looked_up(store):
     from app.sections import block
     rendered = str(block.layout(store))
-    assert "'ranked'" in rendered or '"ranked"' in rendered or "id='ranked'" in rendered
+    assert "id='bk-ranked'" in rendered
     assert "bk-record" in rendered and "bk-search" in rendered
-    assert str(store.meta["rows"]["housing_confidential"]) in rendered
+    assert f"{store.meta['rows']['housing_confidential']:,}" in rendered
     assert "2025" in block.as_of_text(store) and "2026" in block.as_of_text(store)
 
 
