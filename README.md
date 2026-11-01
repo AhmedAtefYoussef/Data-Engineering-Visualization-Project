@@ -1,10 +1,24 @@
 # Affordable housing and street safety in New York City
 
-ICS 503 Data Engineering and Visualization, Project Milestone 1.
+ICS 503 Data Engineering and Visualization.
 
 **Live site:** https://data-engineering-visualization-proj-three.vercel.app/
 
-This project asks whether the streets around city-financed affordable housing have different crash records from comparable streets, before and after the buildings are completed. It joins two NYC Open Data tables that share no key, the housing production table and the police crash table, by ZIP code and year and by distance (crashes within 250 m of a building), and it uses injury crashes from 2016 to 2025 as the outcome. For the 128 new buildings that could be compared fairly, injury crashes within 250 m changed by -4.6% after completion relative to sites not yet completed (95% interval -11.9% to +3.3%), so the data cannot tell this from no change, and the other before-and-after questions are just as inconclusive. The clearest result concerns location before construction: new-construction sites stood on streets with more injury crashes than the typical street point of their borough, about 20 percentile points above its middle (95% interval 10.4 to 23.1). Every result is an association, the before-and-after comparison rests on a small, less densely built part of the programme, and its sign changes with how the sites are chosen (one of 11 robustness variants has an interval that excludes zero). The answers to the ten research questions are in `docs/METHODOLOGY.md`.
+This project asks whether the streets around city-financed affordable housing have different crash records from comparable streets, before and after the buildings are completed. It joins two NYC Open Data tables that share no key, the housing production table and the police crash table, by ZIP code and year and by distance (crashes within 250 m of a building), and it uses injury crashes from 2016 to 2025 as the outcome.
+
+For the 128 new buildings that could be compared fairly, injury crashes within 250 m changed by -4.6% after completion relative to sites not yet completed (95% interval -11.9% to +3.3%), so the data cannot tell this from no change, and the other before-and-after questions are just as inconclusive. The clearest result concerns location before construction: new-construction sites stood on streets with more injury crashes than the typical street point of their borough, 19.1 percentile points above its middle (95% interval 9.4 to 22.3). Every result is an association. The before-and-after comparison rests on a small, less densely built part of the programme, and its estimate depends on how the sites are chosen: three of the 15 robustness variants have an interval that excludes zero, two below it and one above. The answers to the ten research questions are in `docs/METHODOLOGY.md`.
+
+## Contents
+
+- [Datasets](#datasets)
+- [What the website does](#what-the-website-does)
+- [Repository layout](#repository-layout)
+- [Setup and running](#setup-and-running)
+- [Tests and checks](#tests-and-checks)
+- [Deployment on Vercel](#deployment-on-vercel)
+- [How the project was engineered](#how-the-project-was-engineered)
+- [Team contributions](#team-contributions)
+- [Licence and credits](#licence-and-credits)
 
 ## Datasets
 
@@ -15,42 +29,56 @@ This project asks whether the streets around city-financed affordable housing ha
 
 The copies in `notebooks/` were saved on 10 October 2026. The housing file holds all 9,551 rows. The crash file is a filtered copy: crashes dated 2016-01-01 to 2025-12-31 (1,504,722 rows) and 19 of the 29 columns.
 
+## What the website does
+
+One page, read from top to bottom:
+
+| Part | What the reader can do |
+|---|---|
+| The story | Scroll through five chapters in which the 7,593 located buildings, drawn as points of light, regroup into each chapter's chart: the boroughs, where the sites stood before construction, the fair-test funnel, and fifty equally likely answers against zero. |
+| Your block | Search a ZIP code, project or borough, or pick from the sites on the most crash-heavy streets. The record opens beside the list: the site's percentile in its borough, its crashes against the borough median, its before-and-after counts and the sites near it. |
+| Test it | Change who is compared (sites, borough, size, comparison group, cluster, cohort) and the main result is recomputed at once, beside the controls, with every scenario tried left as a mark on the interval axis. |
+| Explore | Type a question in plain words or set the filters, then Generate a report: four figures and charts over time, place, cause and before-and-after, with a shareable link and a CSV. |
+| Findings and Method | The ten research questions with their intervals, the robustness checks, what the data cannot tell, how the tables were joined and the full cleaning log. |
+
+Every figure on the page is read from `app/data/`; none is typed into the code.
+
 ## Repository layout
 
 ```
 notebooks/
-  NYC_Housing_Safety.ipynb     the notebook, with its outputs stored (220 cells)
+  NYC_Housing_Safety.ipynb     the notebook, with its outputs stored (222 cells)
   housing_hg8x-zxpr.csv        the housing data
   crashes_h9gi-nx95.csv.gz     the filtered crash data
 tools/
-  assemble_notebook.py         builds the notebook from the section files and runs it
-  notebook_src/*.py            one file per notebook section (00_title ... 10_story), about 5,000 lines
-  build_app_data.py            runs the same sections and writes the website data
+  notebook_src/*.py            one file per notebook section (00_title ... 10_story), about 5,300 lines
+  assemble_notebook.py         joins the section files into the notebook and executes it
+  build_app_data.py            runs the same sections and writes the website data, then checks it
 app/
-  app.py                       Dash entry point (app.app:server)
-  data.py, filters.py, search.py, stats.py, charts.py, report.py,
-  story.py, layout.py, callbacks.py, theme.py
-  assets/                      site.css, site.js
+  app.py                       Dash entry point (app.app:server) and security headers
+  page.py, sections/           the page and its parts: overview (story), block, lab, explorer, findings, method
+  data.py                      loads app/data and verifies its schema at start-up
+  stats.py                     the bootstrap and difference-in-differences code, shared with the notebook
+  filters.py, search.py, report.py, charts.py, callbacks.py, scenarios.py, block_data.py,
+  story.py, story_data.py, story_text.py, components.py, layout.py, theme.py
+  assets/css/, assets/js/      styles and browser scripts, loaded in file-name order
   data/                        the files the site reads (about 3.3 MB)
-tests/
-  test_site.py                 parser, filters, charts, callbacks, totals
-  test_data_accuracy.py        site numbers recomputed from the raw files
-  conftest.py
+tests/                         13 test files (pipeline, data accuracy, statistics, site, tools, hardening)
 docs/
   ARCHITECTURE.md              modules, data flow, how the statistics are shared
   METHODOLOGY.md               methods, the ten questions and their answers
   DATA_DICTIONARY.md           every table and file, column by column
-  AI_USE.md                    prompts, build process and the AI-use record
-requirements.txt                site dependencies (what Vercel installs)
+  NUMBER_CHANGES.md            every published number that moved, and why
+  AI_USE.md                    the prompts and the full record of how AI agents were used
+requirements.txt                site dependencies, pinned (what Vercel installs)
 requirements-dev.txt            notebook, data build and tests
-pyproject.toml                  Vercel entry point (and pytest settings)
+pyproject.toml                  Vercel entry point, pinned dependencies, pytest and ruff settings
 vercel.json                     function settings for Vercel (maxDuration 60 s)
 .vercelignore                   folders left out of the deployment
+.github/workflows/tests.yml     CI: ruff, the test suite and a coverage floor on every push
 ```
 
-The statistics (cluster bootstrap, difference-in-differences) live once in `app/stats.py`. `tools/assemble_notebook.py` pastes that file into Section 7 of the notebook (the cell `# INLINE: app/stats.py`), so the notebook still imports nothing from the repository and the website uses the same code.
-
-## Setup
+## Setup and running
 
 You need Python 3.12 or newer. The notebook stops at its first code cell on an older version.
 
@@ -60,89 +88,103 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 ```
 
-## Run the notebook
+**Run the notebook.** Open `notebooks/NYC_Housing_Safety.ipynb` in Jupyter and choose Run All. It reads only the two data files from its own folder. If either is missing, Section 2 downloads it from NYC Open Data (the crash download takes several minutes and resumes if interrupted). With both files present it needs no network, and it can be copied alone into any folder together with them.
 
-```bash
-jupyter lab notebooks/NYC_Housing_Safety.ipynb
-```
-
-Choose Run All. The notebook reads only `housing_hg8x-zxpr.csv` and `crashes_h9gi-nx95.csv.gz` from its own folder. If either file is missing, Section 2 downloads it from NYC Open Data and saves it there. The crash download takes several minutes and resumes from the last saved page if it is interrupted. With both files present the run needs no network. To refresh the data, delete the two files and run again; the written interpretations were checked against the 10 October copy and should be read again after a refresh.
-
-The notebook can be copied alone into any folder together with the two data files.
-
-## Rebuild the notebook from its sources
-
-The notebook is generated. Edit the files in `tools/notebook_src/`, then run:
+**Rebuild the notebook from its sources.** The notebook is generated: edit `tools/notebook_src/`, then run
 
 ```bash
 python tools/assemble_notebook.py --execute
 ```
 
-This joins the section files in name order, pastes `app/stats.py` into Section 7, gives every cell a stable id, executes every cell inside `notebooks/`, prints a line budget per section and writes `notebooks/NYC_Housing_Safety.ipynb` with its outputs. If a cell fails, the script prints the failing cell, writes `NYC_Housing_Safety.failed.ipynb` instead of replacing the notebook, and exits with status 1. To work on a few sections, pass their prefixes and write somewhere else (`--src` reads the section files from another folder):
+It joins the sections in name order, pastes `app/stats.py` into Section 7 so the notebook imports nothing from the repository, executes every cell inside `notebooks/` and writes the notebook with its outputs. A failing cell is printed and the notebook is left untouched. For a partial run, pass section prefixes and another output: `--sections 01 02 04 --execute --out /tmp/dev.ipynb`.
 
-```bash
-python tools/assemble_notebook.py --sections 01 02 04 --execute --out /tmp/dev.ipynb --show 04
-```
-
-Later sections use objects built by earlier ones, so a partial run must include everything its sections depend on (the research questions in Section 8 need Sections 1, 2 and 4 to 7).
-
-## Rebuild the website data
+**Rebuild the website data.**
 
 ```bash
 python tools/build_app_data.py
 ```
 
-The script executes the notebook sections (all except the exploratory Section 3) in one process, exports small aggregated tables to `app/data/`, and then checks that the website's own statistics reproduce the notebook's RQ3 and RQ7 estimates and intervals. Pass `--skip-check` to skip that check. It needs the two data files in `notebooks/`, took 47 seconds on the development machine (`app/data/meta.json`), and needs several GB of memory (the script's own note says about 3 GB). The site never reads the raw files.
+It executes the notebook sections in one process (about 75 seconds, about 3 GB of memory), exports small aggregated tables to `app/data/`, records hashes, row counts and library versions in `meta.json`, writes the folder atomically, and checks that the website's own statistics reproduce the notebook's RQ3 and RQ7. Two builds from scratch produce identical tables.
 
-## Run the website locally
+**Run the website locally.**
 
 ```bash
 python -m app.app
 ```
 
-Open http://127.0.0.1:8050. Set the `PORT` environment variable to use another port. The site reads only `app/data/` and downloads nothing at start-up. The map's background tiles load from Carto in the visitor's browser, so the map needs an internet connection.
+Open http://127.0.0.1:8050 (set `PORT` for another port). The site reads only `app/data/`. The map's background tiles load from Carto in the browser, so the map needs an internet connection.
 
-## Run the tests
+## Tests and checks
 
 ```bash
+ruff check app tests tools
 python -m pytest -q tests
 ```
 
-208 tests in two files pass. `tests/test_site.py` covers the search parser, the filters, the pre-aggregated tables (totals must agree across all of them), the chart builders, the callbacks through Flask's test client, and agreement between the site's numbers and the exported results. `tests/test_data_accuracy.py` recomputes the numbers the site shows from the two raw files with separate code and compares them with `app/data/`; it skips itself when the raw files are not in `notebooks/`.
+816 tests pass with 98% coverage of `app/`. They include:
 
-## Deploy on Vercel
+- **Data accuracy:** every exported table and the numbers the site shows, recomputed from the two raw files with separate code. The headline figures and chart totals are checked under 49 filter combinations, 40 of them drawn at random with a fixed seed.
+- **Pipeline contract:** a missing, renamed or retyped column stops the site at start-up with the command that rebuilds the data; the export is atomic.
+- **Statistics:** the bootstrap and difference-in-differences code against hand-computed cases.
+- **Notebook against site:** the result sentences on the site are the notebook's own.
+- **Site:** callbacks through Flask's test client, the search parser, scenarios, the block records, hostile inputs and the page structure.
 
-**Live site: https://data-engineering-visualization-proj-three.vercel.app/**
+The data-accuracy tests skip themselves when the raw files are not in `notebooks/`. CI runs ruff and the suite on every push, with a coverage floor of 97%.
 
-The site is deployed on Vercel from `main`; every push to `main` redeploys it, and each pull request gets its own preview deployment.
+## Deployment on Vercel
 
-Vercel runs the site as one Python function. `pyproject.toml` names the entry point (`app.app:server`, the Flask server that Dash creates), `vercel.json` gives `app/app.py` a `maxDuration` of 60 seconds, `requirements.txt` lists the five packages the site needs, each pinned to an exact version, and `.vercelignore` keeps the notebook, tools, tests and docs out of the deployment.
+The site runs on Vercel as one Python function, redeployed on every push to `main`; each pull request gets its own preview. `pyproject.toml` names the entry point (`app.app:server`), `vercel.json` gives it a `maxDuration` of 60 seconds, and `.vercelignore` keeps the notebook, tools, tests and docs out of the bundle. The project needs no environment variables.
 
-1. Merge the pull request so that `main` holds the site and `app/data/`.
-2. In the Vercel dashboard choose Add New > Project and import the GitHub repository.
-3. Leave the framework preset and the build settings as Vercel detects them. The project needs no environment variables.
-4. Deploy and wait for the build to finish.
-5. Open the `vercel.app` address in a private window. Check that the page is styled, that Generate report redraws every chart, that a search such as "Brooklyn 2022 new construction" fills the filters, and that the page works at phone width.
-6. Write the address into the submission email.
+Keep the installed packages under Vercel's 500 MB limit for a Python function (they take about 410 MB). Above it, Vercel installs the packages on every cold start into a small temporary disk, which fills up, and the page shows "A function needed by this page temporarily failed". That is why the site reads its data with fastparquet (about 17 MB) instead of pyarrow (about 170 MB), and why every version is pinned. Measured in the deployed configuration (the shipped files only, Python 3.12, the pinned packages), a cold start loads the data in about a second and uses about 300 MB.
 
-Two things to know. The function starts on demand, and nothing is precomputed at import, so the first report after a quiet period takes longer than later ones. The installed packages take about 410 MB, under Vercel's 500 MB limit for Python functions. Keep them under it: above the limit Vercel installs the packages on every cold start into a small temporary disk, which fills up, and the page shows "A function needed by this page temporarily failed". That is why the site reads its data with fastparquet (about 17 MB) instead of pyarrow (about 170 MB), and why every version is pinned.
+## How the project was engineered
 
-## Licence and credits
+The code and text were drafted by AI coding agents (Claude models, through Claude Code) under the direction of the project lead, who designed the workflow, set the constraints, reviewed every result and decided what was merged. The full record, with the prompts, is in `docs/AI_USE.md`. This section summarises the method.
 
-The code is released under the MIT licence (`LICENSE`). The two datasets come from NYC Open Data and are used under its terms of use (https://www.nyc.gov/home/terms-of-use.page). The map's background tiles are © CARTO, with map data © OpenStreetMap contributors (ODbL).
+### Orchestrating the agents
 
-## Submission checklist
+The work was organised as a small team of agents with one orchestrator, rather than one long conversation:
 
-Email ICS503Data@gmail.com by 9 November 2026 with:
+- **One orchestrator, many bounded workers.** An orchestrating session planned each wave of work, wrote the briefs, routed tasks, integrated the results and verified them. Workers each received one task with a fixed brief: a role, the files to read, the only files they may edit, the quality bar and the shape of their report.
+- **Ownership boundaries.** Each worker edited only its own files (one notebook section, one area of the site), against a frozen interface contract that named the objects each section hands to the next. Parallel work could not collide, and every change is traceable to one owner.
+- **Separation of writing and judging.** Auditors and reviewers read the code and executed notebook from one point of view each (requirements, statistics, code, prose, charts, design) and returned findings with a location, a severity and a fix, but could not edit what they judged. Writers then applied the findings.
+- **Model tiering for cost and quality.** Reasoning-heavy work (method design, the statistics, the interface contract, architecture and final review) went to the strongest model (Opus), and routine code, prose, charts and tests to a cheaper one (Sonnet); the routing policy for the later rounds also reserved repetitive mechanical work for the cheapest (Haiku). Work that a script can check was never left to a model's judgement.
+- **Parallel waves in isolated worktrees.** Later rounds ran several agents at once, each in its own git worktree and branch, merged by the orchestrator only after its checks passed. The commit history shows two such waves: `[t1]` statistics corrections, `[t2]` server hardening and CI, `[t3]` the checked data contract; then `[n2]` the Your block and Test it tools, `[n3]` the explorer, `[n4]` Findings and Method.
+- **Execution before acceptance.** Nothing counted as done until it had run on the real data, its figures had been looked at, and the tests passed. Interface work was checked in a headless browser at desktop and phone widths, and performance changes were measured before and after, not assumed.
 
-- [ ] the student IDs of all five members
-- [ ] the GitHub repository link
-- [ ] the deployment link (https://data-engineering-visualization-proj-three.vercel.app/)
-- [ ] the links to the two datasets (the table above)
+### The automation pipeline
+
+One rule shapes the pipeline: **the notebook is the source of truth, and everything else is generated from the same code.**
+
+```
+tools/notebook_src/*.py ──► assemble_notebook.py ──► notebooks/NYC_Housing_Safety.ipynb   (executed, outputs stored)
+        │                        ▲
+        │                        └── app/stats.py pasted into Section 7 (one copy of the statistics)
+        │
+        └──────────────► build_app_data.py ──► app/data/*.parquet, results.json, meta.json
+                                 │                  (atomic write, hashes, versions, schema)
+                                 └── re-runs the site's statistics: must reproduce RQ3 and RQ7
+                                                    │
+app/ (Dash) reads only app/data, verifies its schema at start-up
+        │
+git push ──► GitHub Actions: ruff, 816 tests, coverage floor ──► Vercel preview per pull request ──► main: production
+```
+
+The guards are mechanical, not promises:
+
+- **Single source:** no number derived from the data is typed into text; the notebook prints it, and the site reads it from the exported files.
+- **Contract:** the build writes a schema into `meta.json` and the site refuses to start on data that does not match it.
+- **Reproducibility:** the build records library versions and source hashes, and a rebuild from the raw files gives identical tables. The RQ7 reference points were made independent of how a library breaks distance ties, so they give the same result on any machine.
+- **Accuracy:** separate test code recomputes what the site shows from the raw files, under fixed and random queries.
+- **Change log:** every published number that moves is listed in `docs/NUMBER_CHANGES.md` with the reason.
+
+### Verification and incidents
+
+The final round checked the pipeline, the notebook and the website against each other: a full rebuild from the raw files, notebook outputs against `results.json`, the website against raw recounts under random queries, timing of every interactive path, and a click-through of the rebuilt site. It found and fixed one reproducibility defect (the RQ7 distance ties). An earlier production incident, where the site failed intermittently because an unpinned dependency pushed the function past Vercel's size limit, was diagnosed from the runtime logs, reproduced locally in the exact deployed configuration and fixed by replacing pyarrow and pinning every package.
 
 ## Team contributions
 
-Five members, two research questions and two charts each. The table is the same as Section 13 of the notebook. Section numbers refer to the notebook. The answer to each research question is in `docs/METHODOLOGY.md`.
+Five members, two research questions and two charts each. The table is the same as Section 13 of the notebook. Section numbers refer to the notebook.
 
 | Member | Name | Student ID | Research questions and charts | Data cleaning | Integration | Website | Other work |
 |---|---|---|---|---|---|---|---|
@@ -154,6 +196,6 @@ Five members, two research questions and two charts each. The table is the same 
 
 Each member should be able to explain the code and text of their own two questions.
 
-## How this was built
+## Licence and credits
 
-AI coding assistants drafted the code and text, and the team directs and answers for the result. `docs/AI_USE.md` holds the prompts, the build process (including the lean-pipeline refactor) and the checks each student should do. Each student should be able to explain their own research questions and the cleaning and integration choices behind them.
+The code is released under the MIT licence (`LICENSE`). The two datasets come from NYC Open Data and are used under its terms of use (https://www.nyc.gov/home/terms-of-use.page). The map's background tiles are © CARTO, with map data © OpenStreetMap contributors (ODbL).
